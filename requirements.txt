@@ -1,3 +1,7 @@
 pyyaml>=6.0
 numpy>=1.26
 tqdm>=4.66
+datasets>=2.20
+openai>=1.0.0
+python-dotenv>=1.0
+mlx-lm>=0.20
