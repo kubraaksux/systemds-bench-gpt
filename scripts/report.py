@@ -116,6 +116,11 @@ def sort_key(run_dir: Path) -> Tuple[int, str, str]:
     missing = 1 if ts == "" else 0
     return (missing, ts, run_dir.name)
 
+def ts_sort_value(ts: str) -> str:
+    # ISO timestamps sort lexicographically; make missing timestamps very old.
+    return ts if ts else "0000-00-00T00:00:00"
+
+
 
 def safe_float(x: Any) -> Optional[float]:
     if x is None or x == "":
@@ -148,7 +153,8 @@ def main() -> int:
 
     results_dir = Path(args.results_dir)
     run_dirs = iter_run_dirs(results_dir)
-    run_dirs.sort(key=sort_key, reverse=True)
+    run_dirs.sort(key=sort_key)
+
 
     if not run_dirs:
         print(f"Error: no valid run directories found under {results_dir}/", file=sys.stderr)
@@ -183,9 +189,14 @@ def main() -> int:
         except Exception as e:
             print(f"Warning: skipping {run_dir.name}: {e}", file=sys.stderr)
 
-    # latest section (prefer timestamp; fallback already in ordering)
-    latest_rows = rows[:args.latest] if args.latest > 0 else []
+    # Order rows by timestamp for reporting (missing timestamps treated as very old)
+    rows_sorted = sorted(rows, key=lambda r: ts_sort_value(r.get("ts", "")))
+
+    # Latest runs = newest timestamps (not affected by missing-ts runs)
+    latest_rows = rows_sorted[-args.latest:] if args.latest > 0 else []
+
     gen_ts = datetime.now(timezone.utc).isoformat()
+
 
     def table_html(title: str, table_rows: List[Dict[str, Any]]) -> str:
         cols = [
@@ -203,6 +214,10 @@ def main() -> int:
             ("avg_tokens", "avg tok"),
             ("total_input_tokens", "in tok"),
             ("total_output_tokens", "out tok"),
+            ("tokps_total", "tok/s (total)"),
+            ("mstok_total", "ms/tok (total)"),
+            ("tokps_in", "tok/s (out)"),
+            ("mstok_in", "ms/tok (out)"),
         ]
 
         out = [f"<h2>{fmt(title)}</h2>", "<table>", "<thead><tr>"]
@@ -211,22 +226,43 @@ def main() -> int:
         out.append("</tr></thead><tbody>")
 
         for r in table_rows:
-            out.append("<tr>")
-            out.append(f"<td>{fmt(r.get('run_dir'))}</td>")
-            out.append(f"<td>{fmt(r.get('ts'))}</td>")
-            out.append(f"<td>{fmt(r.get('backend'))}</td>")
-            out.append(f"<td>{fmt(r.get('backend_model'))}</td>")
-            out.append(f"<td>{fmt(r.get('workload'))}</td>")
-            out.append(f"<td>{fmt(r.get('n'))}</td>")
-            out.append(f"<td>{fmt_num(r.get('lat_mean'), 2)}</td>")
-            out.append(f"<td>{fmt_num(r.get('lat_p50'), 2)}</td>")
-            out.append(f"<td>{fmt_num(r.get('lat_p95'), 2)}</td>")
-            out.append(f"<td>{fmt_num(r.get('thr'), 4)}</td>")
-            out.append(f"<td>{fmt(r.get('total_tokens'))}</td>")
-            out.append(f"<td>{fmt_num(r.get('avg_tokens'), 2)}</td>")
-            out.append(f"<td>{fmt(r.get('total_input_tokens'))}</td>")
-            out.append(f"<td>{fmt(r.get('total_output_tokens'))}</td>")
-            out.append("</tr>")
+        # Derived normalization metrics (best-effort)
+        thr = safe_float(r.get("thr"))
+        avg_tok = safe_float(r.get("avg_tokens"))
+        n = safe_float(r.get("n"))
+        out_total = safe_float(r.get("total_output_tokens"))
+
+        avg_out = (out_total / n) if (out_total is not None and n is not None and n > 0) else None
+
+        tokps_total = (thr * avg_tok) if (thr is not None and avg_tok is not None) else None
+        mstok_total = (1000.0 / tokps_total) if (tokps_total is not None and tokps_total > 0) else None
+
+        tokps_out = (thr * avg_out) if (thr is not None and avg_out is not None) else None
+        mstok_out = (1000.0 / tokps_out) if (tokps_out is not None and tokps_out > 0) else None
+
+        out.append("<tr>")
+        out.append(f"<td>{fmt(r.get('run_dir'))}</td>")
+        out.append(f"<td>{fmt(r.get('ts'))}</td>")
+        out.append(f"<td>{fmt(r.get('backend'))}</td>")
+        out.append(f"<td>{fmt(r.get('backend_model'))}</td>")
+        out.append(f"<td>{fmt(r.get('workload'))}</td>")
+        out.append(f"<td>{fmt(r.get('n'))}</td>")
+        out.append(f"<td>{fmt_num(r.get('lat_mean'), 2)}</td>")
+        out.append(f"<td>{fmt_num(r.get('lat_p50'), 2)}</td>")
+        out.append(f"<td>{fmt_num(r.get('lat_p95'), 2)}</td>")
+        out.append(f"<td>{fmt_num(r.get('thr'), 4)}</td>")
+        out.append(f"<td>{fmt(r.get('total_tokens'))}</td>")
+        out.append(f"<td>{fmt_num(r.get('avg_tokens'), 2)}</td>")
+        out.append(f"<td>{fmt(r.get('total_input_tokens'))}</td>")
+        out.append(f"<td>{fmt(r.get('total_output_tokens'))}</td>")
+
+        # Derived columns formatting
+        out.append(f"<td>{fmt_num(tokps_total, 2)}</td>")
+        out.append(f"<td>{fmt_num(mstok_total, 2)}</td>")
+        out.append(f"<td>{fmt_num(tokps_out, 2)}</td>")
+        out.append(f"<td>{fmt_num(mstok_out, 2)}</td>")
+
+        out.append("</tr>")
 
         out.append("</tbody></table>")
         return "\n".join(out)
@@ -252,7 +288,7 @@ def main() -> int:
   <div class="meta">Generated (UTC): <code>{fmt(gen_ts)}</code> | Runs found: <code>{len(rows)}</code></div>
 
   {table_html("Latest runs", latest_rows)}
-  {table_html("All runs", rows)}
+  {table_html("All runs", rows_sorted)}
 </body>
 </html>
 """
