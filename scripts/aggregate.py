@@ -18,6 +18,22 @@ def read_json(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
+def manifest_timestamp(run_dir: Path) -> str:
+    """
+    Returns UTC timestamp string from manifest.json if present, else "".
+    Keeps it as a string (ISO 8601) so CSV stays simple.
+    """
+    mpath = run_dir / "manifest.json"
+    if not mpath.exists():
+        return ""
+    try:
+        m = read_json(mpath)
+        ts = m.get("timestamp_utc")
+        return "" if ts is None else str(ts)
+    except Exception:
+        return ""
+
+
 
 def detect_has_tokens(run_dirs: Iterable[Path]) -> bool:
     for run_dir in run_dirs:
@@ -72,7 +88,10 @@ def token_stats(samples_path: Path) -> Tuple[Optional[int], Optional[float]]:
 
 def main() -> int:
     results_dir = Path("results")
-    run_dirs = sorted(iter_run_dirs(results_dir), key=lambda p: p.name)
+    run_dirs = list(iter_run_dirs(results_dir))
+    # sort by manifest timestamp if available; fallback to name
+    run_dirs.sort(key=lambda p: (manifest_timestamp(p) == "", manifest_timestamp(p), p.name))
+
 
     if not run_dirs:
         print("Error: no valid run directories found under results/", file=sys.stderr)
@@ -83,6 +102,7 @@ def main() -> int:
 
     header = [
         "run_dir",
+        "ts",
         "backend",
         "backend_model",
         "n",
@@ -104,6 +124,7 @@ def main() -> int:
 
             row = [
                 run_dir.name,
+                manifest_timestamp(run_dir),
                 cfg.get("backend", ""),
                 cfg.get("backend_model", ""),
                 metrics.get("n", ""),
