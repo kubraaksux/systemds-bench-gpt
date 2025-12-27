@@ -6,8 +6,7 @@ dataset:
   n_samples: 10
 
 generation:
-  # Used by local MLX backend (you override model via CLI)
-  max_tokens: 128
+  max_tokens: 80
   temperature: 0.0
 
 openai:
