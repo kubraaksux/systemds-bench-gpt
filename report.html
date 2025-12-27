@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>systemds-bench-gpt report</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 24px; }
+    h1 { margin: 0 0 6px 0; }
+    .meta { color: #555; margin-bottom: 18px; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0 24px 0; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 13px; }
+    th { background: #f6f6f6; }
+    tr:nth-child(even) { background: #fbfbfb; }
+    code { background: #f2f2f2; padding: 1px 4px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>systemds-bench-gpt report</h1>
+  <div class="meta">Generated (UTC): <code>2025-12-27T20:55:00.710144+00:00</code> | Runs found: <code>8</code></div>
+
+  <h2>Latest runs</h2>
+<table>
+<thead><tr>
+<th>Run</th>
+<th>Timestamp (UTC)</th>
+<th>Backend</th>
+<th>Model</th>
+<th>Workload</th>
+<th>n</th>
+<th>lat mean (ms)</th>
+<th>p50 (ms)</th>
+<th>p95 (ms)</th>
+<th>throughput (req/s)</th>
+<th>total tok</th>
+<th>avg tok</th>
+<th>in tok</th>
+<th>out tok</th>
+</tr></thead><tbody>
+<tr>
+<td>run_openai_20251227_194126</td>
+<td></td>
+<td>openai</td>
+<td>gpt-4.1-mini</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>2022.55</td>
+<td>1846.53</td>
+<td>2969.57</td>
+<td>0.4944</td>
+<td>763</td>
+<td>76.30</td>
+<td>412</td>
+<td>351</td>
+</tr>
+<tr>
+<td>run_openai_20251226_214943</td>
+<td></td>
+<td>openai</td>
+<td>gpt-4.1-mini</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>1495.26</td>
+<td>1146.62</td>
+<td>2672.85</td>
+<td>0.6687</td>
+<td>758</td>
+<td>75.80</td>
+<td>412</td>
+<td>346</td>
+</tr>
+<tr>
+<td>run_mlx_20251227_200823</td>
+<td></td>
+<td>mlx</td>
+<td>mlx-community/Phi-3-mini-4k-instruct-4bit</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>1604.47</td>
+<td>1571.15</td>
+<td>1777.27</td>
+<td>0.6233</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>run_mlx_20251227_195249</td>
+<td></td>
+<td>mlx</td>
+<td>mlx-community/Phi-3-mini-4k-instruct-4bit</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>1647.42</td>
+<td>1630.77</td>
+<td>1768.02</td>
+<td>0.6070</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>run_mlx_20251227_194147</td>
+<td></td>
+<td>mlx</td>
+<td>mlx-community/Phi-3-mini-4k-instruct-4bit</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>2451.26</td>
+<td>2442.01</td>
+<td>2509.81</td>
+<td>0.4080</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>run_mlx_20251227_192902</td>
+<td></td>
+<td>mlx</td>
+<td>mlx-community/Phi-3-mini-4k-instruct-4bit</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>2462.61</td>
+<td>2437.10</td>
+<td>2582.17</td>
+<td>0.4061</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>run_mlx_20251226_221646</td>
+<td></td>
+<td>mlx</td>
+<td>mlx-community/Phi-3-mini-4k-instruct-4bit</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>2668.00</td>
+<td>2456.98</td>
+<td>3326.12</td>
+<td>0.3748</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>run_mlx_20251227_202353</td>
+<td>2025-12-27T19:24:12.052547+00:00</td>
+<td>mlx</td>
+<td>mlx-community/Phi-3-mini-4k-instruct-4bit</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>1588.95</td>
+<td>1560.02</td>
+<td>1709.50</td>
+<td>0.6293</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+  <h2>All runs</h2>
+<table>
+<thead><tr>
+<th>Run</th>
+<th>Timestamp (UTC)</th>
+<th>Backend</th>
+<th>Model</th>
+<th>Workload</th>
+<th>n</th>
+<th>lat mean (ms)</th>
+<th>p50 (ms)</th>
+<th>p95 (ms)</th>
+<th>throughput (req/s)</th>
+<th>total tok</th>
+<th>avg tok</th>
+<th>in tok</th>
+<th>out tok</th>
+</tr></thead><tbody>
+<tr>
+<td>run_openai_20251227_194126</td>
+<td></td>
+<td>openai</td>
+<td>gpt-4.1-mini</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>2022.55</td>
+<td>1846.53</td>
+<td>2969.57</td>
+<td>0.4944</td>
+<td>763</td>
+<td>76.30</td>
+<td>412</td>
+<td>351</td>
+</tr>
+<tr>
+<td>run_openai_20251226_214943</td>
+<td></td>
+<td>openai</td>
+<td>gpt-4.1-mini</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>1495.26</td>
+<td>1146.62</td>
+<td>2672.85</td>
+<td>0.6687</td>
+<td>758</td>
+<td>75.80</td>
+<td>412</td>
+<td>346</td>
+</tr>
+<tr>
+<td>run_mlx_20251227_200823</td>
+<td></td>
+<td>mlx</td>
+<td>mlx-community/Phi-3-mini-4k-instruct-4bit</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>1604.47</td>
+<td>1571.15</td>
+<td>1777.27</td>
+<td>0.6233</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>run_mlx_20251227_195249</td>
+<td></td>
+<td>mlx</td>
+<td>mlx-community/Phi-3-mini-4k-instruct-4bit</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>1647.42</td>
+<td>1630.77</td>
+<td>1768.02</td>
+<td>0.6070</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>run_mlx_20251227_194147</td>
+<td></td>
+<td>mlx</td>
+<td>mlx-community/Phi-3-mini-4k-instruct-4bit</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>2451.26</td>
+<td>2442.01</td>
+<td>2509.81</td>
+<td>0.4080</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>run_mlx_20251227_192902</td>
+<td></td>
+<td>mlx</td>
+<td>mlx-community/Phi-3-mini-4k-instruct-4bit</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>2462.61</td>
+<td>2437.10</td>
+<td>2582.17</td>
+<td>0.4061</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>run_mlx_20251226_221646</td>
+<td></td>
+<td>mlx</td>
+<td>mlx-community/Phi-3-mini-4k-instruct-4bit</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>2668.00</td>
+<td>2456.98</td>
+<td>3326.12</td>
+<td>0.3748</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>run_mlx_20251227_202353</td>
+<td>2025-12-27T19:24:12.052547+00:00</td>
+<td>mlx</td>
+<td>mlx-community/Phi-3-mini-4k-instruct-4bit</td>
+<td>summarization</td>
+<td>10.0</td>
+<td>1588.95</td>
+<td>1560.02</td>
+<td>1709.50</td>
+<td>0.6293</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+</body>
+</html>
