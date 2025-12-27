@@ -226,43 +226,43 @@ def main() -> int:
         out.append("</tr></thead><tbody>")
 
         for r in table_rows:
-        # Derived normalization metrics (best-effort)
-        thr = safe_float(r.get("thr"))
-        avg_tok = safe_float(r.get("avg_tokens"))
-        n = safe_float(r.get("n"))
-        out_total = safe_float(r.get("total_output_tokens"))
+            # Derived normalization metrics (best-effort)
+            thr = safe_float(r.get("thr"))
+            avg_tok = safe_float(r.get("avg_tokens"))
+            n = safe_float(r.get("n"))
+            out_total = safe_float(r.get("total_output_tokens"))
 
-        avg_out = (out_total / n) if (out_total is not None and n is not None and n > 0) else None
+            avg_out = (out_total / n) if (out_total is not None and n is not None and n > 0) else None
 
-        tokps_total = (thr * avg_tok) if (thr is not None and avg_tok is not None) else None
-        mstok_total = (1000.0 / tokps_total) if (tokps_total is not None and tokps_total > 0) else None
+            tokps_total = (thr * avg_tok) if (thr is not None and avg_tok is not None) else None
+            mstok_total = (1000.0 / tokps_total) if (tokps_total is not None and tokps_total > 0) else None
 
-        tokps_out = (thr * avg_out) if (thr is not None and avg_out is not None) else None
-        mstok_out = (1000.0 / tokps_out) if (tokps_out is not None and tokps_out > 0) else None
+            tokps_out = (thr * avg_out) if (thr is not None and avg_out is not None) else None
+            mstok_out = (1000.0 / tokps_out) if (tokps_out is not None and tokps_out > 0) else None
 
-        out.append("<tr>")
-        out.append(f"<td>{fmt(r.get('run_dir'))}</td>")
-        out.append(f"<td>{fmt(r.get('ts'))}</td>")
-        out.append(f"<td>{fmt(r.get('backend'))}</td>")
-        out.append(f"<td>{fmt(r.get('backend_model'))}</td>")
-        out.append(f"<td>{fmt(r.get('workload'))}</td>")
-        out.append(f"<td>{fmt(r.get('n'))}</td>")
-        out.append(f"<td>{fmt_num(r.get('lat_mean'), 2)}</td>")
-        out.append(f"<td>{fmt_num(r.get('lat_p50'), 2)}</td>")
-        out.append(f"<td>{fmt_num(r.get('lat_p95'), 2)}</td>")
-        out.append(f"<td>{fmt_num(r.get('thr'), 4)}</td>")
-        out.append(f"<td>{fmt(r.get('total_tokens'))}</td>")
-        out.append(f"<td>{fmt_num(r.get('avg_tokens'), 2)}</td>")
-        out.append(f"<td>{fmt(r.get('total_input_tokens'))}</td>")
-        out.append(f"<td>{fmt(r.get('total_output_tokens'))}</td>")
+            out.append("<tr>")
+            out.append(f"<td>{fmt(r.get('run_dir'))}</td>")
+            out.append(f"<td>{fmt(r.get('ts'))}</td>")
+            out.append(f"<td>{fmt(r.get('backend'))}</td>")
+            out.append(f"<td>{fmt(r.get('backend_model'))}</td>")
+            out.append(f"<td>{fmt(r.get('workload'))}</td>")
+            out.append(f"<td>{fmt(r.get('n'))}</td>")
+            out.append(f"<td>{fmt_num(r.get('lat_mean'), 2)}</td>")
+            out.append(f"<td>{fmt_num(r.get('lat_p50'), 2)}</td>")
+            out.append(f"<td>{fmt_num(r.get('lat_p95'), 2)}</td>")
+            out.append(f"<td>{fmt_num(r.get('thr'), 4)}</td>")
+            out.append(f"<td>{fmt(r.get('total_tokens'))}</td>")
+            out.append(f"<td>{fmt_num(r.get('avg_tokens'), 2)}</td>")
+            out.append(f"<td>{fmt(r.get('total_input_tokens'))}</td>")
+            out.append(f"<td>{fmt(r.get('total_output_tokens'))}</td>")
 
-        # Derived columns formatting
-        out.append(f"<td>{fmt_num(tokps_total, 2)}</td>")
-        out.append(f"<td>{fmt_num(mstok_total, 2)}</td>")
-        out.append(f"<td>{fmt_num(tokps_out, 2)}</td>")
-        out.append(f"<td>{fmt_num(mstok_out, 2)}</td>")
+            # Derived columns formatting
+            out.append(f"<td>{fmt_num(tokps_total, 2)}</td>")
+            out.append(f"<td>{fmt_num(mstok_total, 2)}</td>")
+            out.append(f"<td>{fmt_num(tokps_out, 2)}</td>")
+            out.append(f"<td>{fmt_num(mstok_out, 2)}</td>")
 
-        out.append("</tr>")
+            out.append("</tr>")
 
         out.append("</tbody></table>")
         return "\n".join(out)
@@ -289,6 +289,7 @@ def main() -> int:
 
   {table_html("Latest runs", latest_rows)}
   {table_html("All runs", rows_sorted)}
+
 </body>
 </html>
 """
