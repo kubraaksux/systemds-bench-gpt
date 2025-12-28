@@ -2,7 +2,7 @@
 
 Backend-agnostic benchmarking suite for Large Language Model (LLM) inference systems.
 
-SYSTEMDS-BENCH-GPT is a systems-oriented evaluation harness for comparing local LLM inference runtimes and hosted LLM APIs under controlled workloads. The focus is on latency, throughput, token efficiency, and runtime stability rather than leaderboard-style accuracy.
+SYSTEMDS-BENCH-GPT is a systems-oriented evaluation harness for comparing local LLM inference runtimes and hosted LLM APIs under controlled workloads. The focus is on latency, throughput, token efficiency, and runtime stability rather than leaderboard-style task accuracy.
 
 ---
 
@@ -35,18 +35,20 @@ Planned:
 
 ## Repository Structure
 
-backends/ Backend adapters (mlx, openai, etc.)
-workloads/ Workload definitions
-scripts/ Aggregation and report generation
-results/ Per-run outputs (generated, ignored by git)
-runner.py Experiment runner
-README.md Project documentation
+- `backends/` — backend adapters (mlx, openai, etc.)
+- `workloads/` — workload definitions
+- `scripts/` — aggregation and report generation
+- `results/` — per-run outputs (generated, ignored by git)
+- `runner.py` — experiment runner
+- `README.md` — project documentation
+
 
 ---
 
 ## Installation
 
 Install Python dependencies:
+
 pip install -r requirements.txt
 
 For hosted APIs, ensure the required API keys are available in the environment (e.g. `OPENAI_API_KEY`).
