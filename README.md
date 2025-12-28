@@ -49,15 +49,21 @@ Planned:
 
 Install Python dependencies:
 
+# Create a virtual environment
 python -m venv .venv
 
+# Activate the virtual environment
 source .venv/bin/activate
 
-python -m pip install -U pip
+# Upgrade pip
+python -m pip install --upgrade pip
 
+# Install project dependencies
 pip install -r requirements.txt
 
-For hosted APIs, ensure the required API keys are available in the environment (e.g. `OPENAI_API_KEY`).
+For hosted API backends, ensure the required API keys are set:
+
+export OPENAI_API_KEY="your_api_key_here"
 
 ---
 
