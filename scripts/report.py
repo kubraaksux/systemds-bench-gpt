@@ -189,11 +189,14 @@ def main() -> int:
         except Exception as e:
             print(f"Warning: skipping {run_dir.name}: {e}", file=sys.stderr)
 
-    # Order rows by timestamp for reporting (missing timestamps treated as very old)
-    rows_sorted = sorted(rows, key=lambda r: ts_sort_value(r.get("ts", "")))
 
-    # Latest runs = newest timestamps (not affected by missing-ts runs)
-    latest_rows = rows_sorted[-args.latest:] if args.latest > 0 else []
+    rows_sorted = sorted(
+        rows,
+        key=lambda r: ts_sort_value(r.get("ts", "")),
+        reverse=True,
+    )
+    latest_rows = rows_sorted[:args.latest] if args.latest > 0 else []
+
 
     gen_ts = datetime.now(timezone.utc).isoformat()
 
@@ -289,6 +292,7 @@ def main() -> int:
 
   {table_html("Latest runs", latest_rows)}
   {table_html("All runs", rows_sorted)}
+
 
 </body>
 </html>
