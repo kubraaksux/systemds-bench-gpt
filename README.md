@@ -49,6 +49,9 @@ Planned:
 
 Install Python dependencies:
 
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
 pip install -r requirements.txt
 
 For hosted APIs, ensure the required API keys are available in the environment (e.g. `OPENAI_API_KEY`).
