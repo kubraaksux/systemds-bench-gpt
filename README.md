@@ -170,6 +170,17 @@ It is not intended as:
 
 ---
 
+## Resources
+
+- **Purpose**: Systems-oriented benchmarking of LLM inference backends
+- **Focus**: Latency, throughput, token efficiency, and runtime stability
+- **Audience**: Systems researchers, inference engineers, and ML infrastructure developers
+- **Status**: Active research prototype
+
+This repository is designed to support reproducible, backend-agnostic evaluation of LLM inference systems rather than leaderboard-style task accuracy.
+
+---
+
 ## Roadmap
 
 Planned extensions include:
