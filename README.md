@@ -10,7 +10,7 @@ SYSTEMDS-BENCH-GPT is a systems-oriented evaluation harness for comparing local 
 
 This repository implements a benchmarking framework to evaluate:
 
-- local inference engines (e.g. MLX, future vLLM, SystemDS)
+- local inference engines (e.g. MLX, vLLM, SystemDS)
 - hosted LLM APIs (e.g. OpenAI-compatible endpoints)
 
 The goal is to enable fair, reproducible, and extensible inference-system comparisons across backends and workloads.
@@ -86,7 +86,6 @@ Aggregate all completed runs into a single CSV summary:
 python scripts/aggregate.py --out results_summary.csv
 
 The aggregated output includes:
-
 - mean, p50, and p95 latency
 - throughput (requests/sec)
 - input, output, and total token counts
@@ -101,7 +100,6 @@ python scripts/report.py
 open report.html
 
 The report includes:
-
 - latest runs (by timestamp)
 - full run history
 - derived normalization metrics such as tokens/sec and ms/token
