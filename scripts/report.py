@@ -190,12 +190,8 @@ def main() -> int:
             print(f"Warning: skipping {run_dir.name}: {e}", file=sys.stderr)
 
 
-    rows_sorted = sorted(
-        rows,
-        key=lambda r: ts_sort_value(r.get("ts", "")),
-        reverse=True,
-    )
-    latest_rows = rows_sorted[:args.latest] if args.latest > 0 else []
+    rows_sorted = sorted(rows, key=lambda r: ts_sort_value(str(r.get("ts", "")))) 
+    latest_rows = rows_sorted[-args.latest:] if args.latest > 0 else []
 
 
     gen_ts = datetime.now(timezone.utc).isoformat()
@@ -219,11 +215,11 @@ def main() -> int:
             ("total_output_tokens", "out tok"),
             ("tokps_total", "tok/s (total)"),
             ("mstok_total", "ms/tok (total)"),
-            ("tokps_in", "tok/s (out)"),
-            ("mstok_in", "ms/tok (out)"),
+            ("tokps_out", "tok/s (out)"),
+            ("mstok_out", "ms/tok (out)"),
         ]
 
-        out = [f"<h2>{fmt(title)}</h2>", "<table>", "<thead><tr>"]
+        out: List[str] = [f"<h2>{fmt(title)}</h2>", "<table>", "<thead><tr>"]
         for _, label in cols:
             out.append(f"<th>{fmt(label)}</th>")
         out.append("</tr></thead><tbody>")
@@ -258,13 +254,10 @@ def main() -> int:
             out.append(f"<td>{fmt_num(r.get('avg_tokens'), 2)}</td>")
             out.append(f"<td>{fmt(r.get('total_input_tokens'))}</td>")
             out.append(f"<td>{fmt(r.get('total_output_tokens'))}</td>")
-
-            # Derived columns formatting
             out.append(f"<td>{fmt_num(tokps_total, 2)}</td>")
             out.append(f"<td>{fmt_num(mstok_total, 2)}</td>")
             out.append(f"<td>{fmt_num(tokps_out, 2)}</td>")
             out.append(f"<td>{fmt_num(mstok_out, 2)}</td>")
-
             out.append("</tr>")
 
         out.append("</tbody></table>")
