@@ -36,12 +36,10 @@ class MLXBackend:
                 
                 in_tokens = None
                 out_tokens = None
-
                 try:
                     in_tokens = len(self.tokenizer.encode(p))
                     out_tokens = len(self.tokenizer.encode(out))
                 except Exception:
-                    # Tokenization failure should not break the benchmark
                     pass
 
                 usage = {}

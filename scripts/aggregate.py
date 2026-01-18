@@ -124,6 +124,63 @@ def token_stats(samples_path: Path) -> Tuple[Optional[int], Optional[float], Opt
     )
 
 
+def ttft_stats(samples_path: Path) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Returns:
+      (ttft_ms_mean, generation_ms_mean)
+    If not available: (None, None)
+    
+    Only processes samples that have TTFT metrics (streaming mode).
+    Non-streaming samples are ignored, not treated as zeros.
+    
+    Checks both top-level and extra dict for backward compatibility.
+    """
+    if not samples_path.exists():
+        return (None, None)
+
+    total_ttft = 0.0
+    total_gen = 0.0
+    count = 0
+
+    try:
+        with samples_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    continue
+
+                # Check top-level first (new format), then extra dict (backward compat)
+                ttft = obj.get("ttft_ms")
+                gen = obj.get("generation_ms")
+                
+                if ttft is None:
+                    # Fall back to extra dict
+                    extra = obj.get("extra") or {}
+                    ttft = extra.get("ttft_ms")
+                    gen = extra.get("generation_ms")
+
+                # Only count samples that have TTFT metrics
+                if ttft is not None:
+                    total_ttft += float(ttft)
+                    if gen is not None:
+                        total_gen += float(gen)
+                    count += 1
+
+    except Exception:
+        return (None, None)
+
+    if count == 0:
+        return (None, None)
+
+    return (
+        total_ttft / count,
+        total_gen / count if total_gen > 0 else None,
+    )
+
 def sort_key(run_dir: Path) -> Tuple[int, str, str]:
     """
     Sort runs chronologically by manifest timestamp if available.
@@ -155,14 +212,26 @@ def main() -> int:
         "backend_model",
         "workload",
         "n",
+        "accuracy_mean",
+        "accuracy_count",
+        "cost_total_usd",
+        "cost_per_1m_tokens",
+        "memory_mb_peak",
+        "cpu_percent_avg",
         "latency_ms_mean",
+        "latency_ms_std",
+        "latency_ms_min",
+        "latency_ms_max",
         "latency_ms_p50",
         "latency_ms_p95",
+        "latency_ms_cv",
         "throughput_req_per_s",
         "total_tokens",
         "avg_tokens",
         "total_input_tokens",
         "total_output_tokens",
+        "ttft_ms_mean",
+        "generation_ms_mean",
     ]
 
     if args.out == "-":
@@ -182,7 +251,26 @@ def main() -> int:
                 cfg = read_json(run_dir / "run_config.json")
                 ts = manifest_timestamp(run_dir)
                 total, avg, total_in, total_out = token_stats(run_dir / "samples.jsonl")
+                ttft_mean, gen_mean = ttft_stats(run_dir / "samples.jsonl")
 
+                # Get accuracy from metrics.json (stored by runner)
+                accuracy_mean = metrics.get("accuracy_mean")
+                accuracy_count = metrics.get("accuracy_count", "")
+                
+                # Get cost from metrics.json
+                cost_total = metrics.get("cost_total_usd")
+                cost_per_1m = metrics.get("cost_per_1m_tokens")
+                
+                # Get resource usage metrics
+                memory_mb_peak = metrics.get("memory_mb_peak")
+                cpu_percent_avg = metrics.get("cpu_percent_avg")
+                
+                # Get latency variance metrics
+                lat_std = metrics.get("latency_ms_std")
+                lat_min = metrics.get("latency_ms_min")
+                lat_max = metrics.get("latency_ms_max")
+                lat_cv = metrics.get("latency_ms_cv")
+                
                 row = [
                     run_dir.name,
                     ts,
@@ -190,14 +278,26 @@ def main() -> int:
                     cfg.get("backend_model", ""),
                     cfg.get("workload", ""),
                     metrics.get("n", ""),
+                    "" if accuracy_mean is None else f"{accuracy_mean:.4f}",
+                    accuracy_count,
+                    "" if cost_total is None else f"{cost_total:.6f}",
+                    "" if cost_per_1m is None else f"{cost_per_1m:.4f}",
+                    "" if memory_mb_peak is None else f"{memory_mb_peak:.1f}",
+                    "" if cpu_percent_avg is None else f"{cpu_percent_avg:.1f}",
                     metrics.get("latency_ms_mean", ""),
+                    "" if lat_std is None else f"{lat_std:.2f}",
+                    "" if lat_min is None else f"{lat_min:.2f}",
+                    "" if lat_max is None else f"{lat_max:.2f}",
                     metrics.get("latency_ms_p50", ""),
                     metrics.get("latency_ms_p95", ""),
+                    "" if lat_cv is None else f"{lat_cv:.4f}",
                     metrics.get("throughput_req_per_s", ""),
                     "" if total is None else total,
                     "" if avg is None else f"{avg:.4f}",
                     "" if total_in is None else total_in,
                     "" if total_out is None else total_out,
+                    "" if ttft_mean is None else f"{ttft_mean:.2f}",
+                    "" if gen_mean is None else f"{gen_mean:.2f}",
                 ]
                 writer.writerow(row)
             except Exception as e:

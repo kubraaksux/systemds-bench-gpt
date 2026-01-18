@@ -1,8 +1,8 @@
 name: summarization
 
+# Available sources: toy (built-in), cnn (CNN/DailyMail), xsum (BBC XSum)
 dataset:
-  # PR1: keep it fully local and deterministic (no HF download required)
-  source: toy
+  source: xsum
   n_samples: 10
 
 generation:
@@ -13,5 +13,6 @@ openai:
   model: gpt-4.1-mini
   max_output_tokens: 128
   temperature: 0.0
+  streaming: true 
   max_retries: 5
   base_sleep_s: 0.5
