@@ -520,7 +520,22 @@ def generate_charts_section(rows: List[Dict[str, Any]]) -> str:
     return '\n'.join(out)
 
 
-# Define ALL columns for the full table
+# Helper to show cost only for OpenAI (where it's actually tracked)
+def fmt_cost_if_real(r: Dict[str, Any]) -> str:
+    cost = r.get("cost")
+    backend = r.get("backend", "")
+    if backend == "openai" and cost is not None:
+        return fmt_cost(cost)
+    return "-"
+
+def fmt_cost_per_1m_if_real(r: Dict[str, Any]) -> str:
+    cost = r.get("cost_per_1m_tokens")
+    backend = r.get("backend", "")
+    if backend == "openai" and cost is not None:
+        return fmt_cost(cost)
+    return "-"
+
+# Define ALL columns for the full table (removed TTFT/Gen mean - not tracked yet)
 FULL_TABLE_COLUMNS = [
     ("run_dir", "Run", lambda r: f'<code>{html.escape(str(r.get("run_dir", ""))[:25])}</code>'),
     ("ts", "Timestamp (UTC)", lambda r: html.escape((r.get("ts", "") or "")[:19].replace("T", " "))),
@@ -529,8 +544,8 @@ FULL_TABLE_COLUMNS = [
     ("workload", "Workload", lambda r: html.escape(r.get("workload", ""))),
     ("n", "n", lambda r: fmt(r.get("n"))),
     ("accuracy", "Accuracy", lambda r: f'{r.get("accuracy_mean", 0)*100:.1f}% ({r.get("accuracy_count", "")})' if r.get("accuracy_mean") is not None else "N/A"),
-    ("cost", "Cost ($)", lambda r: fmt_cost(r.get("cost"))),
-    ("cost_per_1m", "$/1M tok", lambda r: fmt_cost(r.get("cost_per_1m_tokens"))),
+    ("cost", "Cost ($)", fmt_cost_if_real),
+    ("cost_per_1m", "$/1M tok", fmt_cost_per_1m_if_real),
     ("mem_peak", "Mem Peak (MB)", lambda r: fmt_num(r.get("mem_peak"), 1)),
     ("cpu_avg", "CPU Avg (%)", lambda r: fmt_num(r.get("cpu_avg"), 1)),
     ("lat_mean", "lat mean (ms)", lambda r: fmt_num(r.get("lat_mean"), 2)),
@@ -540,8 +555,6 @@ FULL_TABLE_COLUMNS = [
     ("lat_cv", "Lat CV (%)", lambda r: fmt_pct(r.get("lat_cv"))),
     ("lat_min", "Lat Min (ms)", lambda r: fmt_num(r.get("lat_min"), 2)),
     ("lat_max", "Lat Max (ms)", lambda r: fmt_num(r.get("lat_max"), 2)),
-    ("ttft_mean", "TTFT mean (ms)", lambda r: fmt_num(r.get("ttft_mean"), 2)),
-    ("gen_mean", "Gen mean (ms)", lambda r: fmt_num(r.get("gen_mean"), 2)),
     ("thr", "throughput (req/s)", lambda r: fmt_num(r.get("thr"), 4)),
     ("total_tokens", "total tok", lambda r: fmt(r.get("total_tokens"))),
     ("avg_tokens", "avg tok", lambda r: fmt_num(r.get("avg_tokens"), 1)),
