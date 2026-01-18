@@ -196,7 +196,8 @@ class VLLMBackend:
                     "input_tokens": in_tokens,
                     "output_tokens": out_tokens,
                     "total_tokens": in_tokens + out_tokens,
-                }
+                },
+                "cost_usd": 0.0  # vLLM self-hosted is free (only hardware costs)
             }
         }
     
@@ -244,6 +245,7 @@ class VLLMBackend:
                     "input_tokens": in_tokens,
                     "output_tokens": out_tokens,
                     "total_tokens": in_tokens + out_tokens,
-                }
+                },
+                "cost_usd": 0.0  # vLLM self-hosted is free (only hardware costs)
             }
         }

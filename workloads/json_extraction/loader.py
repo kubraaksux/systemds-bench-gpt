@@ -196,9 +196,18 @@ def _load_ner_samples(n: int) -> List[Sample]:
     Load from CoNLL-2003 NER dataset.
     
     Task: Extract named entities (persons, organizations, locations) from text.
+    Falls back to toy dataset if HuggingFace dataset fails.
     """
-    # Load CoNLL-2003 dataset
-    dataset = load_dataset("eriktks/conll2003", split="test", trust_remote_code=True)
+    # Try to load CoNLL-2003 dataset
+    try:
+        dataset = load_dataset("conll2003", split="test")
+    except Exception as e1:
+        try:
+            # Try alternate source
+            dataset = load_dataset("eriktks/conll2003", split="test")
+        except Exception as e2:
+            print(f"Warning: Could not load CoNLL-2003 dataset, falling back to toy data. Error: {e2}")
+            return _load_toy_samples(n)
     
     # NER tag mapping for CoNLL-2003
     # Tags: O, B-PER, I-PER, B-ORG, I-ORG, B-LOC, I-LOC, B-MISC, I-MISC

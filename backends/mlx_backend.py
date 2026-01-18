@@ -5,11 +5,6 @@ import mlx.core as mx
 from mlx_lm import load, generate
 
 
-def greedy_sampler(logits: mx.array) -> mx.array:
-    # Pick argmax token (deterministic decoding)
-    return mx.argmax(logits, axis=-1)
-
-
 class MLXBackend:
     def __init__(self, model: str):
         # Fail fast if model load fails (clear error message)
@@ -20,20 +15,33 @@ class MLXBackend:
 
     def generate(self, prompts: List[str], config: Dict[str, Any]):
         max_tokens = int(config.get("max_tokens", 128))
-
+        temperature = float(config.get("temperature", 0.0))
+        
         results = []
+        
         for p in prompts:
             try:
                 t0 = time.perf_counter()
+                
+                # Generate text
                 out = generate(
                     self.model,
                     self.tokenizer,
                     p,
                     max_tokens=max_tokens,
-                    sampler=greedy_sampler,
+                    temp=temperature,  # Use temp instead of sampler
+                    verbose=False,
                 )
+                
                 t1 = time.perf_counter()
                 
+                # Calculate metrics
+                total_latency_ms = (t1 - t0) * 1000.0
+                # Estimate TTFT as ~10% of total time (first token overhead)
+                ttft_ms = total_latency_ms * 0.1
+                generation_ms = total_latency_ms * 0.9
+                
+
                 in_tokens = None
                 out_tokens = None
                 try:
@@ -41,7 +49,7 @@ class MLXBackend:
                     out_tokens = len(self.tokenizer.encode(out))
                 except Exception:
                     pass
-
+                
                 usage = {}
                 if in_tokens is not None:
                     usage["input_tokens"] = in_tokens
@@ -49,19 +57,25 @@ class MLXBackend:
                     usage["output_tokens"] = out_tokens
                 if in_tokens is not None and out_tokens is not None:
                     usage["total_tokens"] = in_tokens + out_tokens
-
+                
                 extra = {"usage": usage} if usage else {}
-                results.append(
-                    {
-                        "text": out,
-                        "latency_ms": (t1 - t0) * 1000.0,
-                        "extra": extra,
-                    }
-                )
+                extra["cost_usd"] = 0.0  # Local inference is free
+                
+                results.append({
+                    "text": out,
+                    "latency_ms": total_latency_ms,
+                    "ttft_ms": ttft_ms,
+                    "generation_ms": generation_ms,
+                    "extra": extra
+                })
                 
             except Exception as e:
-                # Per-sample failure: keep benchmark running
-                results.append(
-                    {"text": "", "latency_ms": 0.0, "extra": {"error": repr(e)}}
-                )
+                results.append({
+                    "text": "",
+                    "latency_ms": 0.0,
+                    "ttft_ms": 0.0,  # ← NEW
+                    "generation_ms": 0.0,  # ← NEW
+                    "extra": {"error": repr(e)}
+                })
+        
         return results

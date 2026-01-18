@@ -154,7 +154,8 @@ class OllamaBackend:
                     "input_tokens": in_tokens,
                     "output_tokens": out_tokens,
                     "total_tokens": in_tokens + out_tokens,
-                }
+                },
+                "cost_usd": 0.0  # Local inference is free
             }
         }
     
@@ -201,6 +202,7 @@ class OllamaBackend:
                     "input_tokens": in_tokens,
                     "output_tokens": out_tokens,
                     "total_tokens": in_tokens + out_tokens,
-                }
+                },
+                "cost_usd": 0.0  # Local inference is free
             }
         }
