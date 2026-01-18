@@ -103,6 +103,7 @@ def cost_stats(samples_path: Path) -> Optional[float]:
     if not samples_path.exists():
         return None
     total_cost = 0.0
+    found_any = False
     try:
         with samples_path.open("r", encoding="utf-8") as f:
             for line in f:
@@ -114,12 +115,44 @@ def cost_stats(samples_path: Path) -> Optional[float]:
                     extra = obj.get("extra") or {}
                     cost = extra.get("cost_usd")
                     if cost is not None:
+                        found_any = True
                         total_cost += float(cost)
                 except Exception:
                     continue
     except Exception:
         return None
-    return total_cost if total_cost > 0 else None
+    # Return 0.0 for local backends (they report cost_usd: 0.0)
+    return total_cost if found_any else None
+
+
+def timing_stats(samples_path: Path) -> Tuple[Optional[float], Optional[float]]:
+    """Calculate TTFT and generation time means from samples."""
+    if not samples_path.exists():
+        return (None, None)
+    ttft_vals = []
+    gen_vals = []
+    try:
+        with samples_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                    ttft = obj.get("ttft_ms")
+                    gen = obj.get("generation_ms")
+                    if ttft is not None:
+                        ttft_vals.append(float(ttft))
+                    if gen is not None:
+                        gen_vals.append(float(gen))
+                except Exception:
+                    continue
+    except Exception:
+        return (None, None)
+    
+    ttft_mean = sum(ttft_vals) / len(ttft_vals) if ttft_vals else None
+    gen_mean = sum(gen_vals) / len(gen_vals) if gen_vals else None
+    return (ttft_mean, gen_mean)
 
 
 def safe_float(x: Any) -> Optional[float]:
@@ -133,15 +166,31 @@ def safe_float(x: Any) -> Optional[float]:
 
 def fmt(x: Any) -> str:
     if x is None:
-        return ""
+        return "N/A"
     return html.escape(str(x))
 
 
 def fmt_num(x: Any, digits: int = 2) -> str:
     v = safe_float(x)
     if v is None:
-        return ""
+        return "N/A"
     return f"{v:.{digits}f}"
+
+
+def fmt_pct(x: Any, digits: int = 1) -> str:
+    v = safe_float(x)
+    if v is None:
+        return "N/A"
+    return f"{v:.{digits}f}%"
+
+
+def fmt_cost(x: Any) -> str:
+    v = safe_float(x)
+    if v is None:
+        return "N/A"
+    if v == 0:
+        return "$0.00"
+    return f"${v:.4f}"
 
 
 # Colors for backends
@@ -375,6 +424,9 @@ def generate_summary_cards(rows: List[Dict[str, Any]]) -> str:
     latencies = [safe_float(r.get("lat_p50")) for r in rows if safe_float(r.get("lat_p50")) is not None]
     avg_latency = sum(latencies) / len(latencies) if latencies else 0
     
+    costs = [safe_float(r.get("cost")) for r in rows if safe_float(r.get("cost")) is not None]
+    total_cost = sum(costs) if costs else 0
+    
     out = ['<div class="summary-cards">']
     
     cards = [
@@ -383,6 +435,7 @@ def generate_summary_cards(rows: List[Dict[str, Any]]) -> str:
         ("Workloads", str(len(workloads)), "#e74c3c"),
         ("Avg Accuracy", f"{avg_accuracy:.0f}%", "#2ecc71"),
         ("Avg Latency", f"{avg_latency:.0f}ms", "#f39c12"),
+        ("Total Cost", f"${total_cost:.4f}", "#1abc9c"),
     ]
     
     for label, value, color in cards:
@@ -467,74 +520,89 @@ def generate_charts_section(rows: List[Dict[str, Any]]) -> str:
     return '\n'.join(out)
 
 
-def generate_detailed_table(title: str, table_rows: List[Dict[str, Any]]) -> str:
-    """Generate detailed results table."""
-    cols = [
-        ("run_dir", "Run"),
-        ("ts", "Timestamp"),
-        ("backend", "Backend"),
-        ("backend_model", "Model"),
-        ("workload", "Workload"),
-        ("n", "n"),
-        ("accuracy_count", "Accuracy"),
-        ("lat_mean", "Latency (mean)"),
-        ("lat_p50", "p50"),
-        ("lat_p95", "p95"),
-        ("thr", "Throughput"),
-        ("total_tokens", "Tokens"),
-        ("cost", "Cost"),
-    ]
-    
-    out = [f'<h2>{html.escape(title)}</h2>', '<div class="table-container"><table>']
+# Define ALL columns for the full table
+FULL_TABLE_COLUMNS = [
+    ("run_dir", "Run", lambda r: f'<code>{html.escape(str(r.get("run_dir", ""))[:25])}</code>'),
+    ("ts", "Timestamp (UTC)", lambda r: html.escape((r.get("ts", "") or "")[:19].replace("T", " "))),
+    ("backend", "Backend", lambda r: html.escape(r.get("backend", ""))),
+    ("backend_model", "Model", lambda r: html.escape(str(r.get("backend_model", ""))[:20])),
+    ("workload", "Workload", lambda r: html.escape(r.get("workload", ""))),
+    ("n", "n", lambda r: fmt(r.get("n"))),
+    ("accuracy", "Accuracy", lambda r: f'{r.get("accuracy_mean", 0)*100:.1f}% ({r.get("accuracy_count", "")})' if r.get("accuracy_mean") is not None else "N/A"),
+    ("cost", "Cost ($)", lambda r: fmt_cost(r.get("cost"))),
+    ("cost_per_1m", "$/1M tok", lambda r: fmt_cost(r.get("cost_per_1m_tokens"))),
+    ("mem_peak", "Mem Peak (MB)", lambda r: fmt_num(r.get("mem_peak"), 1)),
+    ("cpu_avg", "CPU Avg (%)", lambda r: fmt_num(r.get("cpu_avg"), 1)),
+    ("lat_mean", "lat mean (ms)", lambda r: fmt_num(r.get("lat_mean"), 2)),
+    ("lat_p50", "p50 (ms)", lambda r: fmt_num(r.get("lat_p50"), 2)),
+    ("lat_p95", "p95 (ms)", lambda r: fmt_num(r.get("lat_p95"), 2)),
+    ("lat_std", "Lat Std (ms)", lambda r: fmt_num(r.get("lat_std"), 2)),
+    ("lat_cv", "Lat CV (%)", lambda r: fmt_pct(r.get("lat_cv"))),
+    ("lat_min", "Lat Min (ms)", lambda r: fmt_num(r.get("lat_min"), 2)),
+    ("lat_max", "Lat Max (ms)", lambda r: fmt_num(r.get("lat_max"), 2)),
+    ("ttft_mean", "TTFT mean (ms)", lambda r: fmt_num(r.get("ttft_mean"), 2)),
+    ("gen_mean", "Gen mean (ms)", lambda r: fmt_num(r.get("gen_mean"), 2)),
+    ("thr", "throughput (req/s)", lambda r: fmt_num(r.get("thr"), 4)),
+    ("total_tokens", "total tok", lambda r: fmt(r.get("total_tokens"))),
+    ("avg_tokens", "avg tok", lambda r: fmt_num(r.get("avg_tokens"), 1)),
+    ("total_input_tokens", "in tok", lambda r: fmt(r.get("total_input_tokens"))),
+    ("total_output_tokens", "out tok", lambda r: fmt(r.get("total_output_tokens"))),
+    ("toks_total", "tok/s (total)", lambda r: fmt_num(r.get("toks_total"), 2)),
+    ("ms_per_tok_total", "ms/tok (total)", lambda r: fmt_num(r.get("ms_per_tok_total"), 2)),
+    ("toks_out", "tok/s (out)", lambda r: fmt_num(r.get("toks_out"), 2)),
+    ("ms_per_tok_out", "ms/tok (out)", lambda r: fmt_num(r.get("ms_per_tok_out"), 2)),
+]
+
+
+def generate_full_table(title: str, table_rows: List[Dict[str, Any]], table_id: str = "", is_h3: bool = False) -> str:
+    """Generate full results table with all columns."""
+    tag = "h3" if is_h3 else "h2"
+    out = [f'<div class="table-header">']
+    out.append(f'<{tag}>{html.escape(title)}</{tag}>')
+    out.append(f'<div>')
+    out.append(f'<button class="btn-small" onclick="printSection(\'{table_id}\')">Print</button>')
+    out.append(f'<button class="btn-small" onclick="exportTableToCSV(\'{table_id}\', \'{table_id}.csv\')">CSV</button>')
+    out.append(f'<button class="btn-small" onclick="copyTableToClipboard(\'{table_id}\')">Copy</button>')
+    out.append(f'</div></div>')
+    out.append(f'<div class="table-wrapper" id="{table_id}">')
+    out.append('<table class="full-table">')
     out.append('<thead><tr>')
-    for _, label in cols:
+    for _, label, _ in FULL_TABLE_COLUMNS:
         out.append(f'<th>{html.escape(label)}</th>')
     out.append('</tr></thead><tbody>')
     
     for r in table_rows:
         out.append('<tr>')
-        out.append(f'<td><code>{html.escape(str(r.get("run_dir", ""))[:30])}</code></td>')
-        ts = r.get("ts", "")
-        if ts:
-            ts = ts[:19].replace("T", " ")
-        out.append(f'<td>{html.escape(ts)}</td>')
-        
-        backend = r.get("backend", "")
-        color = BACKEND_COLORS.get(backend, "#666")
-        out.append(f'<td><span class="badge" style="background: {color};">{html.escape(backend)}</span></td>')
-        
-        out.append(f'<td>{html.escape(str(r.get("backend_model", ""))[:25])}</td>')
-        
-        workload = r.get("workload", "")
-        wl_color = WORKLOAD_COLORS.get(workload, "#666")
-        out.append(f'<td><span class="badge" style="background: {wl_color};">{html.escape(workload)}</span></td>')
-        
-        out.append(f'<td>{fmt(r.get("n"))}</td>')
-        
-        acc = r.get("accuracy_mean")
-        acc_count = r.get("accuracy_count", "")
-        if acc is not None:
-            pct = acc * 100
-            acc_color = "#2ecc71" if pct >= 80 else "#f39c12" if pct >= 50 else "#e74c3c"
-            out.append(f'<td style="color: {acc_color}; font-weight: bold;">{pct:.0f}% ({acc_count})</td>')
-        else:
-            out.append('<td>-</td>')
-        
-        out.append(f'<td>{fmt_num(r.get("lat_mean"))}ms</td>')
-        out.append(f'<td>{fmt_num(r.get("lat_p50"))}ms</td>')
-        out.append(f'<td>{fmt_num(r.get("lat_p95"))}ms</td>')
-        out.append(f'<td>{fmt_num(r.get("thr"), 3)} req/s</td>')
-        out.append(f'<td>{fmt(r.get("total_tokens"))}</td>')
-        
-        cost = r.get("cost")
-        if cost is not None:
-            out.append(f'<td>${cost:.4f}</td>')
-        else:
-            out.append('<td>-</td>')
-        
+        for _, _, render_fn in FULL_TABLE_COLUMNS:
+            out.append(f'<td>{render_fn(r)}</td>')
         out.append('</tr>')
     
     out.append('</tbody></table></div>')
+    return '\n'.join(out)
+
+
+def generate_workload_tables(rows: List[Dict[str, Any]]) -> str:
+    """Generate separate tables for each workload category."""
+    # Group by workload
+    by_workload: Dict[str, List[Dict[str, Any]]] = {}
+    for r in rows:
+        wl = r.get("workload", "unknown")
+        if wl not in by_workload:
+            by_workload[wl] = []
+        by_workload[wl].append(r)
+    
+    out = ['<h2>Performance by Workload Category</h2>']
+    
+    for wl in sorted(by_workload.keys()):
+        wl_rows = by_workload[wl]
+        table_id = f"workload-{wl.replace('_', '-')}"
+        out.append(generate_full_table(
+            wl.replace("_", " ").title(), 
+            wl_rows, 
+            table_id,
+            is_h3=True
+        ))
+    
     return '\n'.join(out)
 
 
@@ -560,6 +628,23 @@ def main() -> int:
             ts = manifest_timestamp(run_dir)
             total, avg, total_in, total_out = token_stats(run_dir / "samples.jsonl")
             cost = cost_stats(run_dir / "samples.jsonl")
+            ttft_mean, gen_mean = timing_stats(run_dir / "samples.jsonl")
+            
+            # Calculate derived metrics
+            lat_mean = safe_float(metrics.get("latency_ms_mean"))
+            lat_std = safe_float(metrics.get("latency_ms_std"))
+            lat_cv = (lat_std / lat_mean * 100) if lat_mean and lat_std else None
+            
+            # Token throughput metrics
+            n = safe_float(metrics.get("n")) or 1
+            total_time_s = (lat_mean * n / 1000) if lat_mean else None
+            toks_total = (total / total_time_s) if total and total_time_s else None
+            toks_out = (total_out / total_time_s) if total_out and total_time_s else None
+            ms_per_tok_total = (1000 / toks_total) if toks_total else None
+            ms_per_tok_out = (1000 / toks_out) if toks_out else None
+            
+            # Cost per 1M tokens
+            cost_per_1m = (cost / total * 1_000_000) if cost and total else None
 
             rows.append({
                 "run_dir": run_dir.name,
@@ -568,10 +653,14 @@ def main() -> int:
                 "backend_model": cfg.get("backend_model", ""),
                 "workload": cfg.get("workload", ""),
                 "n": metrics.get("n", ""),
-                "lat_mean": metrics.get("latency_ms_mean", ""),
-                "lat_p50": metrics.get("latency_ms_p50", ""),
-                "lat_p95": metrics.get("latency_ms_p95", ""),
-                "thr": metrics.get("throughput_req_per_s", ""),
+                "lat_mean": metrics.get("latency_ms_mean"),
+                "lat_p50": metrics.get("latency_ms_p50"),
+                "lat_p95": metrics.get("latency_ms_p95"),
+                "lat_std": lat_std,
+                "lat_cv": lat_cv,
+                "lat_min": metrics.get("latency_ms_min"),
+                "lat_max": metrics.get("latency_ms_max"),
+                "thr": metrics.get("throughput_req_per_s"),
                 "accuracy_mean": metrics.get("accuracy_mean"),
                 "accuracy_count": metrics.get("accuracy_count", ""),
                 "total_tokens": total,
@@ -579,6 +668,15 @@ def main() -> int:
                 "total_input_tokens": total_in,
                 "total_output_tokens": total_out,
                 "cost": cost,
+                "cost_per_1m_tokens": cost_per_1m,
+                "mem_peak": metrics.get("memory_mb_peak"),
+                "cpu_avg": metrics.get("cpu_percent_avg"),
+                "ttft_mean": ttft_mean or metrics.get("ttft_ms_mean"),
+                "gen_mean": gen_mean or metrics.get("generation_ms_mean"),
+                "toks_total": toks_total,
+                "toks_out": toks_out,
+                "ms_per_tok_total": ms_per_tok_total,
+                "ms_per_tok_out": ms_per_tok_out,
             })
         except Exception as e:
             print(f"Warning: skipping {run_dir.name}: {e}", file=sys.stderr)
@@ -602,25 +700,26 @@ def main() -> int:
         background: #f8f9fa;
         color: #333;
     }}
-    .container {{ max-width: 1400px; margin: 0 auto; }}
+    .container {{ max-width: 100%; margin: 0 auto; }}
     h1 {{ margin: 0 0 8px 0; color: #1a1a2e; }}
     h2 {{ margin: 30px 0 15px 0; color: #1a1a2e; border-bottom: 2px solid #eee; padding-bottom: 8px; }}
+    h3 {{ margin: 20px 0 10px 0; color: #333; }}
     .meta {{ color: #666; margin-bottom: 24px; font-size: 14px; }}
     
     .summary-cards {{
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
         gap: 16px;
         margin-bottom: 30px;
     }}
     .card {{
         background: white;
-        padding: 20px;
+        padding: 16px;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }}
-    .card-value {{ font-size: 28px; font-weight: bold; color: #1a1a2e; }}
-    .card-label {{ font-size: 13px; color: #666; margin-top: 4px; }}
+    .card-value {{ font-size: 24px; font-weight: bold; color: #1a1a2e; }}
+    .card-label {{ font-size: 12px; color: #666; margin-top: 4px; }}
     
     .charts-grid {{
         display: grid;
@@ -658,46 +757,120 @@ def main() -> int:
         text-align: left;
     }}
     
-    .table-container {{
+    /* Full table with all columns - compact */
+    .table-wrapper {{
         overflow-x: auto;
         background: white;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 24px;
     }}
-    table {{ 
+    .table-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }}
+    .table-header h2, .table-header h3 {{
+        margin: 0;
+    }}
+    .btn-small {{
+        padding: 6px 12px;
+        background: #3498db;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        margin-left: 8px;
+    }}
+    .btn-small:hover {{ background: #2980b9; }}
+    .full-table {{ 
         border-collapse: collapse; 
-        width: 100%; 
-        font-size: 13px;
+        width: max-content;
+        min-width: 100%;
+        font-size: 9px;
     }}
-    th, td {{ 
-        padding: 10px 12px; 
+    .full-table th, .full-table td {{ 
+        padding: 4px 6px; 
         text-align: left; 
-        border-bottom: 1px solid #eee;
+        border: 1px solid #ddd;
         white-space: nowrap;
     }}
-    th {{ 
-        background: #f8f9fa; 
+    .full-table th {{ 
+        background: #f0f0f0; 
         font-weight: 600;
         color: #1a1a2e;
         position: sticky;
         top: 0;
+        font-size: 8px;
     }}
-    tr:hover {{ background: #f8f9fa; }}
-    
-    .badge {{
-        display: inline-block;
-        padding: 3px 8px;
-        border-radius: 4px;
-        color: white;
-        font-size: 11px;
-        font-weight: 500;
-    }}
+    .full-table tr:nth-child(even) {{ background: #fafafa; }}
+    .full-table tr:hover {{ background: #f0f7ff; }}
     
     code {{ 
         background: #f1f3f4; 
-        padding: 2px 6px; 
-        border-radius: 4px; 
-        font-size: 12px;
+        padding: 2px 4px; 
+        border-radius: 3px; 
+        font-size: 10px;
+    }}
+    
+    /* Print/Export buttons */
+    .toolbar {{
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }}
+    .btn {{
+        padding: 10px 20px;
+        background: #3498db;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }}
+    .btn:hover {{ background: #2980b9; }}
+    .btn-green {{ background: #2ecc71; }}
+    .btn-green:hover {{ background: #27ae60; }}
+    .btn-purple {{ background: #9b59b6; }}
+    .btn-purple:hover {{ background: #8e44ad; }}
+    
+    /* Print styles for better screenshot/print */
+    @media print {{
+        .toolbar {{ display: none !important; }}
+        body {{ 
+            padding: 10px; 
+            background: white;
+            font-size: 9px;
+        }}
+        .summary-cards, .charts-grid, .chart-container {{ 
+            break-inside: avoid; 
+        }}
+        .table-wrapper {{
+            overflow: visible;
+            box-shadow: none;
+        }}
+        .full-table {{
+            font-size: 8px;
+        }}
+        .full-table th, .full-table td {{
+            padding: 3px 4px;
+        }}
+        h2 {{ 
+            break-before: page;
+            margin-top: 10px;
+        }}
+    }}
+    
+    @page {{
+        size: landscape;
+        margin: 0.5cm;
     }}
     
     @media (max-width: 768px) {{
@@ -711,6 +884,21 @@ def main() -> int:
     <h1>systemds-bench-gpt Benchmark Report</h1>
     <div class="meta">Generated: {gen_ts} | Total Runs: {len(rows)}</div>
     
+    <div class="toolbar">
+      <button class="btn" onclick="window.print()">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z"/><path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2H5zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1z"/></svg>
+        Print Report
+      </button>
+      <button class="btn btn-green" onclick="exportTableToCSV('all-runs', 'benchmark_all_runs.csv')">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+        Export CSV
+      </button>
+      <button class="btn btn-purple" onclick="copyTableToClipboard('all-runs')">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg>
+        Copy Table
+      </button>
+    </div>
+    
     {generate_summary_cards(rows)}
     
     {generate_accuracy_comparison_table(rows_sorted)}
@@ -719,9 +907,89 @@ def main() -> int:
     
     {generate_charts_section(rows_sorted)}
     
-    {generate_detailed_table("Latest Benchmark Runs", latest_rows)}
+    {generate_full_table("Latest Runs", latest_rows, "latest-runs")}
+    
+    {generate_full_table("All Runs", rows_sorted, "all-runs")}
+    
+    {generate_workload_tables(rows_sorted)}
     
   </div>
+  
+  <script>
+    function exportTableToCSV(tableId, filename) {{
+      const table = document.querySelector('#' + tableId + ' table');
+      if (!table) {{ alert('Table not found'); return; }}
+      
+      let csv = [];
+      const rows = table.querySelectorAll('tr');
+      
+      for (const row of rows) {{
+        const cols = row.querySelectorAll('th, td');
+        const rowData = [];
+        for (const col of cols) {{
+          let text = col.innerText.replace(/"/g, '""');
+          rowData.push('"' + text + '"');
+        }}
+        csv.push(rowData.join(','));
+      }}
+      
+      const csvContent = csv.join('\\n');
+      const blob = new Blob([csvContent], {{ type: 'text/csv;charset=utf-8;' }});
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+    }}
+    
+    function copyTableToClipboard(tableId) {{
+      const table = document.querySelector('#' + tableId + ' table');
+      if (!table) {{ alert('Table not found'); return; }}
+      
+      let text = [];
+      const rows = table.querySelectorAll('tr');
+      
+      for (const row of rows) {{
+        const cols = row.querySelectorAll('th, td');
+        const rowData = [];
+        for (const col of cols) {{
+          rowData.push(col.innerText);
+        }}
+        text.push(rowData.join('\\t'));
+      }}
+      
+      navigator.clipboard.writeText(text.join('\\n')).then(() => {{
+        alert('Table copied to clipboard! Paste in Excel or Google Sheets.');
+      }});
+    }}
+    
+    function printSection(tableId) {{
+      const tableWrapper = document.getElementById(tableId);
+      if (!tableWrapper) {{ alert('Table not found'); return; }}
+      
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <html>
+        <head>
+          <title>Print - ${{tableId}}</title>
+          <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 20px; }}
+            table {{ border-collapse: collapse; width: 100%; font-size: 8px; }}
+            th, td {{ border: 1px solid #ddd; padding: 4px 6px; text-align: left; white-space: nowrap; }}
+            th {{ background: #f0f0f0; font-weight: bold; }}
+            tr:nth-child(even) {{ background: #fafafa; }}
+            @page {{ size: landscape; margin: 0.5cm; }}
+          </style>
+        </head>
+        <body>
+          <h2>${{tableId.replace(/-/g, ' ').replace(/workload /i, '')}}</h2>
+          ${{tableWrapper.innerHTML}}
+          <script>window.onload = function() {{ window.print(); window.close(); }}</` + `script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }}
+  </script>
 </body>
 </html>
 """

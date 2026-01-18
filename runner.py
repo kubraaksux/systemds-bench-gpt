@@ -193,10 +193,10 @@ def main():
             if accuracy_check_fn is not None and reference_text:
                 predictions_for_accuracy.append((prediction_text, reference_text))
             
-            # Extract TTFT metrics from extra dict (if present)
+            # Extract TTFT metrics (can be at top level or in extra dict)
             extra_data = o.get("extra", {})
-            ttft_ms = extra_data.get("ttft_ms")
-            generation_ms = extra_data.get("generation_ms")
+            ttft_ms = o.get("ttft_ms") or extra_data.get("ttft_ms")
+            generation_ms = o.get("generation_ms") or extra_data.get("generation_ms")
             
             rec = {
                 "id": s.sid,

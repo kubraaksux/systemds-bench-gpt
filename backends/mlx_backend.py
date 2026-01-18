@@ -59,7 +59,11 @@ class MLXBackend:
                     usage["total_tokens"] = in_tokens + out_tokens
                 
                 extra = {"usage": usage} if usage else {}
-                extra["cost_usd"] = 0.0  # Local inference is free
+                # Estimate compute cost based on Apple Silicon M-series (~$0.50/hr equivalent)
+                # This is an estimate of what similar cloud compute would cost
+                compute_hours = total_latency_ms / 1000.0 / 3600.0
+                extra["cost_usd"] = compute_hours * 0.50  # ~$0.50/hr for Apple Silicon equivalent
+                extra["cost_note"] = "estimated_compute"
                 
                 results.append({
                     "text": out,

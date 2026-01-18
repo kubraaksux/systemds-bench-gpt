@@ -144,6 +144,9 @@ class OllamaBackend:
         in_tokens = len(prompt) // 4
         out_tokens = len(text) // 4
         
+        # Estimate compute cost based on typical consumer GPU (~$0.30/hr equivalent)
+        compute_hours = total_latency_ms / 1000.0 / 3600.0
+        
         return {
             "text": text,
             "latency_ms": total_latency_ms,
@@ -155,7 +158,8 @@ class OllamaBackend:
                     "output_tokens": out_tokens,
                     "total_tokens": in_tokens + out_tokens,
                 },
-                "cost_usd": 0.0  # Local inference is free
+                "cost_usd": compute_hours * 0.30,
+                "cost_note": "estimated_compute"
             }
         }
     
@@ -192,6 +196,9 @@ class OllamaBackend:
         in_tokens = data.get("prompt_eval_count", len(prompt) // 4)
         out_tokens = data.get("eval_count", len(text) // 4)
         
+        # Estimate compute cost based on typical consumer GPU (~$0.30/hr equivalent)
+        compute_hours = total_latency_ms / 1000.0 / 3600.0
+        
         return {
             "text": text,
             "latency_ms": total_latency_ms,
@@ -203,6 +210,7 @@ class OllamaBackend:
                     "output_tokens": out_tokens,
                     "total_tokens": in_tokens + out_tokens,
                 },
-                "cost_usd": 0.0  # Local inference is free
+                "cost_usd": compute_hours * 0.30,
+                "cost_note": "estimated_compute"
             }
         }

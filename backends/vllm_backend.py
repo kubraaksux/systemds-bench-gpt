@@ -186,6 +186,10 @@ class VLLMBackend:
             in_tokens = len(prompt) // 4
             out_tokens = len(text) // 4
         
+        # Estimate compute cost based on cloud GPU equivalent
+        # T4 GPU: ~$0.35/hr, A100: ~$1.50/hr - use T4 as typical Colab GPU
+        compute_hours = total_latency_ms / 1000.0 / 3600.0
+        
         return {
             "text": text,
             "latency_ms": total_latency_ms,
@@ -197,7 +201,8 @@ class VLLMBackend:
                     "output_tokens": out_tokens,
                     "total_tokens": in_tokens + out_tokens,
                 },
-                "cost_usd": 0.0  # vLLM self-hosted is free (only hardware costs)
+                "cost_usd": compute_hours * 0.35,  # T4 GPU equivalent
+                "cost_note": "estimated_compute"
             }
         }
     
@@ -235,6 +240,9 @@ class VLLMBackend:
         
         total_latency_ms = (t1 - t0) * 1000.0
         
+        # Estimate compute cost based on T4 GPU (~$0.35/hr)
+        compute_hours = total_latency_ms / 1000.0 / 3600.0
+        
         return {
             "text": text,
             "latency_ms": total_latency_ms,
@@ -246,6 +254,7 @@ class VLLMBackend:
                     "output_tokens": out_tokens,
                     "total_tokens": in_tokens + out_tokens,
                 },
-                "cost_usd": 0.0  # vLLM self-hosted is free (only hardware costs)
+                "cost_usd": compute_hours * 0.35,
+                "cost_note": "estimated_compute"
             }
         }
