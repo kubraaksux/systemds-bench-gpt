@@ -331,16 +331,64 @@ def extract_json_from_prediction(prediction: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _normalize_value(val) -> str:
+    """Normalize a value for comparison (lowercase, strip whitespace)."""
+    if val is None:
+        return ""
+    if isinstance(val, bool):
+        return str(val).lower()
+    if isinstance(val, (int, float)):
+        return str(val)
+    if isinstance(val, str):
+        return val.lower().strip()
+    if isinstance(val, list):
+        return str(sorted([_normalize_value(v) for v in val]))
+    if isinstance(val, dict):
+        return str({k: _normalize_value(v) for k, v in sorted(val.items())})
+    return str(val).lower().strip()
+
+
+def _values_match(pred_val, ref_val) -> bool:
+    """Check if two values match (with some tolerance)."""
+    # Normalize both values
+    pred_norm = _normalize_value(pred_val)
+    ref_norm = _normalize_value(ref_val)
+    
+    # Exact match after normalization
+    if pred_norm == ref_norm:
+        return True
+    
+    # For strings, check if one contains the other (handles "Dr. Maria Garcia" vs "Maria Garcia")
+    if isinstance(ref_val, str) and isinstance(pred_val, str):
+        ref_lower = ref_val.lower().strip()
+        pred_lower = pred_val.lower().strip()
+        if ref_lower in pred_lower or pred_lower in ref_lower:
+            return True
+    
+    # For numbers, allow small tolerance
+    if isinstance(ref_val, (int, float)) and isinstance(pred_val, (int, float)):
+        if ref_val == 0:
+            return pred_val == 0
+        return abs(pred_val - ref_val) / abs(ref_val) < 0.01  # 1% tolerance
+    
+    return False
+
+
 def accuracy_check(prediction: str, reference: str) -> bool:
     """
-    Check if the prediction contains valid JSON with required fields.
+    Check if the prediction contains valid JSON with correct field values.
+    
+    Accuracy criteria (hybrid approach - best practice):
+    1. Must produce valid JSON
+    2. Must have all required fields
+    3. At least 70% of field values must match (with tolerance)
     
     Args:
         prediction: The model's full response text
         reference: The expected JSON string
     
     Returns:
-        True if valid JSON with all required fields present, False otherwise
+        True if valid JSON with >= 70% correct field values, False otherwise
     """
     # Parse the reference to get expected fields
     try:
@@ -362,10 +410,14 @@ def accuracy_check(prediction: str, reference: str) -> bool:
     if not required_fields.issubset(present_fields):
         return False
     
-    # Bonus: Check if values are reasonable (not empty/null for required fields)
-    for field in required_fields:
-        value = pred_dict.get(field)
-        if value is None or value == "":
-            return False
+    # Count matching values
+    matches = 0
+    total = len(ref_dict)
     
-    return True
+    for field, ref_val in ref_dict.items():
+        pred_val = pred_dict.get(field)
+        if _values_match(pred_val, ref_val):
+            matches += 1
+    
+    # Require at least 70% of values to match
+    return (matches / total) >= 0.70
