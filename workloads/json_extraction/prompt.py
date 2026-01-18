@@ -11,7 +11,10 @@ def make_prompt(sample: Sample, cfg: Dict[str, Any]) -> str:
     and return valid JSON with specified fields.
     """
     return (
-        "Extract information from the following text and return ONLY valid JSON.\n\n"
+        "You are a JSON extraction assistant. Extract information from the text below.\n"
+        "Output ONLY a valid JSON object. Do NOT write code. Do NOT explain.\n"
+        "Start your response with { and end with }.\n\n"
         f"Text: {sample.text}\n\n"
-        f"Return JSON with these fields: {sample.schema}"
+        f"Extract these fields: {sample.schema}\n\n"
+        "JSON output:"
     )
