@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """Generate HTML benchmark report with charts and visualizations."""
 import argparse
 import html
@@ -121,7 +121,7 @@ def cost_stats(samples_path: Path) -> Optional[float]:
                     continue
     except Exception:
         return None
-    # Return 0.0 for local backends (they report cost_usd: 0.0)
+    # return 0.0 for local backends (they report cost_usd: 0.0)
     return total_cost if found_any else None
 
 
@@ -193,7 +193,7 @@ def fmt_cost(x: Any) -> str:
     return f"${v:.4f}"
 
 
-# Colors for backends
+# colors for backends
 BACKEND_COLORS = {
     "openai": "#10a37f",
     "mlx": "#ff6b6b",
@@ -201,7 +201,7 @@ BACKEND_COLORS = {
     "vllm": "#9b59b6",
 }
 
-# Colors for workloads
+# colors for workloads
 WORKLOAD_COLORS = {
     "math": "#3498db",
     "reasoning": "#e74c3c",
@@ -234,13 +234,13 @@ def generate_bar_chart_svg(data: List[Tuple[str, float, str]], title: str,
         y = top_margin + i * (bar_height + gap)
         bar_width = (value / max_val) * chart_width if max_val > 0 else 0
         
-        # Label
+  
         svg.append(f'<text x="{left_margin - 8}" y="{y + bar_height//2 + 4}" text-anchor="end" font-size="11">{html.escape(label[:15])}</text>')
         
-        # Bar
+     
         svg.append(f'<rect x="{left_margin}" y="{y}" width="{bar_width}" height="{bar_height}" fill="{color}" rx="3"/>')
         
-        # Value
+  
         if show_values:
             val_text = f"{value:.1f}{value_suffix}" if isinstance(value, float) else f"{value}{value_suffix}"
             svg.append(f'<text x="{left_margin + bar_width + 5}" y="{y + bar_height//2 + 4}" font-size="11">{val_text}</text>')
@@ -287,7 +287,7 @@ def generate_grouped_bar_chart_svg(data: Dict[str, Dict[str, float]], title: str
     for i, category in enumerate(categories):
         cat_y = top_margin + i * category_height
         
-        # Category label
+
         svg.append(f'<text x="{left_margin - 8}" y="{cat_y + category_height//2}" text-anchor="end" font-size="11">{html.escape(category[:18])}</text>')
         
         for j, group in enumerate(groups):
@@ -304,7 +304,7 @@ def generate_grouped_bar_chart_svg(data: Dict[str, Dict[str, float]], title: str
     
     svg.append('</svg>')
     
-    # Legend as HTML
+   
     legend = ['<div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px; justify-content: center;">']
     for group in groups:
         color = group_colors.get(group, "#999")
@@ -319,12 +319,12 @@ def generate_grouped_bar_chart_svg(data: Dict[str, Dict[str, float]], title: str
 
 def generate_accuracy_comparison_table(rows: List[Dict[str, Any]]) -> str:
     """Generate accuracy comparison table by workload and backend."""
-    # Group by base workload and backend, take latest run only
-    # This avoids duplicates like "reasoning" and "reasoning (toy)"
-    data: Dict[str, Dict[str, Dict[str, Any]]] = {}  # workload -> backend -> metrics
+    # group by base workload and backend, take latest run only
+    # this avoids duplicates like "reasoning" and "reasoning (toy)"
+    data: Dict[str, Dict[str, Dict[str, Any]]] = {} 
     
     for r in rows:
-        # Use base workload name (not workload_full) to consolidate
+
         workload = r.get("workload", "")
         backend = r.get("backend", "")
         if not workload or not backend:
@@ -333,7 +333,7 @@ def generate_accuracy_comparison_table(rows: List[Dict[str, Any]]) -> str:
         if workload not in data:
             data[workload] = {}
         
-        # Keep latest (rows are sorted by timestamp desc, so first one wins)
+        # keep latest
         if backend not in data[workload]:
             data[workload][backend] = r
     
@@ -372,18 +372,18 @@ def generate_accuracy_comparison_table(rows: List[Dict[str, Any]]) -> str:
 
 def generate_latency_comparison_table(rows: List[Dict[str, Any]]) -> str:
     """Generate latency comparison table by workload and backend."""
-    # Use workload_full to include dataset source
+ 
     data: Dict[str, Dict[str, Dict[str, Any]]] = {}
     
     for r in rows:
-        # Use base workload name to consolidate
+
         workload = r.get("workload", "")
         backend = r.get("backend", "")
         if not workload or not backend:
             continue
         if workload not in data:
             data[workload] = {}
-        # Keep latest only
+
         if backend not in data[workload]:
             data[workload][backend] = r
     
@@ -419,7 +419,7 @@ def generate_latency_comparison_table(rows: List[Dict[str, Any]]) -> str:
 
 def generate_latency_breakdown_table(rows: List[Dict[str, Any]]) -> str:
     """Generate latency breakdown table showing TTFT vs Generation time (like prefill vs decode)."""
-    # Only include rows with TTFT data
+    # only include rows with TTFT data
     data: Dict[str, Dict[str, Dict[str, Any]]] = {}
     
     for r in rows:
@@ -464,7 +464,7 @@ def generate_latency_breakdown_table(rows: List[Dict[str, Any]]) -> str:
                 if ttft and gen:
                     ttft_pct = (ttft / (ttft + gen)) * 100
                     pct_str = f'{ttft_pct:.0f}%'
-                    # Color based on TTFT proportion
+                    # color based on TTFT proportion
                     color = '#2ecc71' if ttft_pct < 30 else '#f39c12' if ttft_pct < 60 else '#e74c3c'
                 else:
                     pct_str = '-'
@@ -520,7 +520,7 @@ def generate_consistency_metrics_table(rows: List[Dict[str, Any]]) -> str:
                 
                 if cv is not None:
                     cv_str = f'{cv:.1f}%'
-                    # Color based on consistency (lower is better)
+                 
                     color = '#2ecc71' if cv < 20 else '#f39c12' if cv < 50 else '#e74c3c'
                 else:
                     cv_str = '-'
@@ -536,7 +536,7 @@ def generate_consistency_metrics_table(rows: List[Dict[str, Any]]) -> str:
 
 def generate_cost_efficiency_table(rows: List[Dict[str, Any]]) -> str:
     """Generate cost efficiency comparison table (cost per correct answer)."""
-    # Use base workload name to consolidate
+  
     data: Dict[str, Dict[str, Dict[str, Any]]] = {}
     
     for r in rows:
@@ -546,7 +546,7 @@ def generate_cost_efficiency_table(rows: List[Dict[str, Any]]) -> str:
             continue
         if workload not in data:
             data[workload] = {}
-        # Keep latest only
+    
         if backend not in data[workload]:
             data[workload][backend] = r
     
@@ -577,13 +577,13 @@ def generate_cost_efficiency_table(rows: List[Dict[str, Any]]) -> str:
                     correct_count = int(n * acc_mean)
                     cost_per_correct = cost / correct_count if correct_count > 0 else None
                     if cost_per_correct is not None:
-                        # Color based on cost (green = cheap, red = expensive)
+                       
                         color = "#2ecc71" if cost_per_correct < 0.001 else "#f39c12" if cost_per_correct < 0.01 else "#e74c3c"
                         out.append(f'<td style="background: {color}22; color: {color}; font-weight: bold;">${cost_per_correct:.4f}</td>')
                     else:
                         out.append('<td>-</td>')
                 elif b != "openai":
-                    # Local backends have no cost
+                  
                     out.append('<td style="color: #2ecc71;">$0 (local)</td>')
                 else:
                     out.append('<td>-</td>')
@@ -598,7 +598,7 @@ def generate_cost_efficiency_table(rows: List[Dict[str, Any]]) -> str:
 def generate_cost_analysis_section(rows: List[Dict[str, Any]]) -> str:
     """Generate comprehensive cost analysis comparing cloud vs local inference."""
     
-    # Collect OpenAI costs
+
     openai_costs = []
     local_runs = []
     
@@ -633,7 +633,7 @@ def generate_cost_analysis_section(rows: List[Dict[str, Any]]) -> str:
     
     out = ['<h2>💰 Cost Analysis: Cloud vs Local Inference</h2>']
     
-    # Summary stats
+  
     total_openai_cost = sum(c["cost"] for c in openai_costs)
     avg_cost_per_run = total_openai_cost / len(openai_costs) if openai_costs else 0
     total_queries = sum(c["n"] for c in openai_costs)
@@ -641,13 +641,13 @@ def generate_cost_analysis_section(rows: List[Dict[str, Any]]) -> str:
     
     out.append('<div class="cost-analysis-grid">')
     
-    # Cloud costs card
+
     out.append('''
     <div class="cost-card cloud">
         <h3>☁️ Cloud (OpenAI API)</h3>
         <div class="cost-stats">
     ''')
-    # Calculate cost per 1M tokens
+   
     total_tokens = sum(safe_float(c.get("total_tokens", 0)) or 0 for c in openai_costs)
     cost_per_1m_tokens = (total_openai_cost / total_tokens * 1_000_000) if total_tokens > 0 else None
     
@@ -668,7 +668,7 @@ def generate_cost_analysis_section(rows: List[Dict[str, Any]]) -> str:
     </div>
     ''')
     
-    # Local costs card
+ 
     out.append('''
     <div class="cost-card local">
         <h3>🖥️ Local Inference</h3>
@@ -688,19 +688,19 @@ def generate_cost_analysis_section(rows: List[Dict[str, Any]]) -> str:
     </div>
     ''')
     
-    out.append('</div>')  # End cost-analysis-grid
+    out.append('</div>')  
     
-    # Cost projection table
+  
     out.append('<h3>📊 Cost Projection (1000 queries)</h3>')
     out.append('<table class="comparison-table">')
     out.append('<thead><tr><th>Backend</th><th>Est. Cost (1000 queries)</th><th>Notes</th></tr></thead>')
     out.append('<tbody>')
     
-    # Project OpenAI cost
+
     projected_1k = cost_per_query * 1000
     out.append(f'<tr><td>OpenAI (gpt-4.1-mini)</td><td style="color: #e74c3c; font-weight: bold;">${projected_1k:.2f}</td><td>Based on current usage</td></tr>')
     
-    # Local backends
+
     out.append('<tr><td>Ollama (local)</td><td style="color: #2ecc71; font-weight: bold;">$0</td><td>Requires Mac/Linux, ~4GB RAM</td></tr>')
     out.append('<tr><td>MLX (Apple Silicon)</td><td style="color: #2ecc71; font-weight: bold;">$0</td><td>Requires M1/M2/M3 Mac</td></tr>')
     out.append('<tr><td>vLLM (GPU server)</td><td style="color: #f39c12; font-weight: bold;">~$5-20</td><td>Cloud GPU: ~$0.20-0.50/hour</td></tr>')
@@ -719,7 +719,7 @@ def generate_scatter_plot_svg(data: List[Tuple[float, float, str, str]],
     if not data:
         return '<p class="muted">No data with both cost and accuracy</p>'
     
-    # Filter out invalid data
+    
     valid_data = [(x, y, l, c) for x, y, l, c in data if x > 0 and y is not None]
     if not valid_data:
         return '<p class="muted">No runs with cost data</p>'
@@ -746,22 +746,22 @@ def generate_scatter_plot_svg(data: List[Tuple[float, float, str, str]],
     svg = [f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">']
     svg.append(f'<text x="{width//2}" y="20" text-anchor="middle" font-size="14" font-weight="bold">{html.escape(title)}</text>')
     
-    # Axes
+  
     svg.append(f'<line x1="{left_margin}" y1="{top_margin}" x2="{left_margin}" y2="{top_margin + chart_height}" stroke="#ccc" stroke-width="1"/>')
     svg.append(f'<line x1="{left_margin}" y1="{top_margin + chart_height}" x2="{left_margin + chart_width}" y2="{top_margin + chart_height}" stroke="#ccc" stroke-width="1"/>')
     
-    # Axis labels
+
     svg.append(f'<text x="{left_margin + chart_width//2}" y="{height - 10}" text-anchor="middle" font-size="11">{html.escape(x_label)}</text>')
     svg.append(f'<text x="15" y="{top_margin + chart_height//2}" text-anchor="middle" font-size="11" transform="rotate(-90, 15, {top_margin + chart_height//2})">{html.escape(y_label)}</text>')
     
-    # Grid lines and Y axis ticks
+    
     for pct in [25, 50, 75, 100]:
         if pct <= y_max:
             y = scale_y(pct)
             svg.append(f'<line x1="{left_margin}" y1="{y}" x2="{left_margin + chart_width}" y2="{y}" stroke="#eee" stroke-width="1"/>')
             svg.append(f'<text x="{left_margin - 5}" y="{y + 4}" text-anchor="end" font-size="9">{pct}%</text>')
     
-    # Points with labels - collect unique workloads for legend
+    
     seen_workloads = {}
     for x, y, label, color in valid_data:
         px, py = scale_x(x), scale_y(y)
@@ -769,7 +769,7 @@ def generate_scatter_plot_svg(data: List[Tuple[float, float, str, str]],
         if label not in seen_workloads:
             seen_workloads[label] = color
     
-    # Legend (on the right side)
+    
     legend_x = left_margin + chart_width + 15
     legend_y = top_margin + 10
     for i, (label, color) in enumerate(seen_workloads.items()):
@@ -783,13 +783,13 @@ def generate_scatter_plot_svg(data: List[Tuple[float, float, str, str]],
 
 def generate_summary_section(rows: List[Dict[str, Any]]) -> str:
     """Generate comprehensive summary statistics section."""
-    # Get unique backends, workloads, models
+  
     backends = set(r.get("backend") for r in rows if r.get("backend"))
     workloads = set(r.get("workload") for r in rows if r.get("workload"))
     models = set(r.get("backend_model") for r in rows if r.get("backend_model"))
     total_runs = len(rows)
     
-    # Calculate stats
+
     costs = [safe_float(r.get("cost")) for r in rows if r.get("backend") == "openai" and safe_float(r.get("cost"))]
     total_cost = sum(costs) if costs else 0
     runs_with_cost = len(costs)
@@ -800,7 +800,7 @@ def generate_summary_section(rows: List[Dict[str, Any]]) -> str:
     min_latency = min(latencies) if latencies else 0
     max_latency = max(latencies) if latencies else 0
     
-    # Best/worst accuracy by workload
+
     acc_by_workload: Dict[str, List[float]] = {}
     for r in rows:
         wl = r.get("workload", "")
@@ -827,7 +827,7 @@ def generate_summary_section(rows: List[Dict[str, Any]]) -> str:
     out.append('<h2>📊 Summary Statistics</h2>')
     out.append('<div class="summary-grid">')
     
-    # Overview card
+    
     out.append('''
     <div class="summary-card">
         <div class="card-header">OVERVIEW</div>
@@ -839,7 +839,7 @@ def generate_summary_section(rows: List[Dict[str, Any]]) -> str:
     out.append(f'<div class="stat-row"><span class="stat-label">Backends:</span> <span class="stat-value">{", ".join(sorted(backends))}</span></div>')
     out.append('</div></div>')
     
-    # Cost card
+
     out.append('''
     <div class="summary-card">
         <div class="card-header">💰 COST</div>
@@ -850,7 +850,7 @@ def generate_summary_section(rows: List[Dict[str, Any]]) -> str:
     out.append(f'<div class="stat-row"><span class="stat-label">Avg Cost/Run:</span> <span class="stat-value">${avg_cost:.4f}</span></div>')
     out.append('</div></div>')
     
-    # Accuracy card
+ 
     out.append('''
     <div class="summary-card">
         <div class="card-header">🎯 ACCURACY</div>
@@ -860,7 +860,7 @@ def generate_summary_section(rows: List[Dict[str, Any]]) -> str:
     out.append(f'<div class="stat-row"><span class="stat-label">Hardest Workload:</span> <span class="stat-value">{worst_workload} ({worst_acc:.1f}%)</span></div>')
     out.append('</div></div>')
     
-    # Latency card
+    
     out.append('''
     <div class="summary-card">
         <div class="card-header">⚡ LATENCY</div>
@@ -871,13 +871,13 @@ def generate_summary_section(rows: List[Dict[str, Any]]) -> str:
     out.append(f'<div class="stat-row"><span class="stat-label">Max:</span> <span class="stat-value">{max_latency:.2f} ms</span></div>')
     out.append('</div></div>')
     
-    out.append('</div>')  # End summary-grid
+    out.append('</div>') 
     
-    # Visualizations section
+  
     out.append('<h2>📈 Visualizations</h2>')
     out.append('<div class="viz-grid">')
     
-    # Accuracy bar chart
+    
     accuracy_bars = []
     for wl, accs in sorted(acc_by_workload.items()):
         avg = sum(accs) / len(accs)
@@ -888,7 +888,7 @@ def generate_summary_section(rows: List[Dict[str, Any]]) -> str:
     out.append(generate_bar_chart_svg(accuracy_bars, "Accuracy by Workload", width=350, height=250, value_suffix="%"))
     out.append('</div>')
     
-    # Cost vs Accuracy scatter plot
+   
     scatter_data = []
     for r in rows:
         cost = safe_float(r.get("cost"))
@@ -902,8 +902,8 @@ def generate_summary_section(rows: List[Dict[str, Any]]) -> str:
     out.append(generate_scatter_plot_svg(scatter_data, "Cost vs Accuracy", "Cost ($)", "Accuracy (%)", width=450, height=250))
     out.append('</div>')
     
-    out.append('</div>')  # End viz-grid
-    out.append('</div>')  # End summary-section
+    out.append('</div>')  
+    out.append('</div>') 
     
     return '\n'.join(out)
 
@@ -917,7 +917,7 @@ def generate_charts_section(rows: List[Dict[str, Any]]) -> str:
     """Generate all charts."""
     out = ['<h2>Performance Charts</h2>', '<div class="charts-grid">']
     
-    # Group data by workload and backend (latest only)
+    
     latest: Dict[str, Dict[str, Dict[str, Any]]] = {}
     for r in rows:
         wl = r.get("workload", "")
@@ -928,7 +928,7 @@ def generate_charts_section(rows: List[Dict[str, Any]]) -> str:
             latest[wl] = {}
         latest[wl][be] = r
     
-    # Accuracy by Backend chart
+    
     accuracy_data: Dict[str, Dict[str, float]] = {}
     for wl, backends in latest.items():
         accuracy_data[wl] = {}
@@ -945,14 +945,14 @@ def generate_charts_section(rows: List[Dict[str, Any]]) -> str:
         ))
         out.append('</div>')
     
-    # Latency by Backend chart
+   
     latency_data: Dict[str, Dict[str, float]] = {}
     for wl, backends in latest.items():
         latency_data[wl] = {}
         for be, r in backends.items():
             lat = safe_float(r.get("lat_p50"))
             if lat is not None:
-                latency_data[wl][be] = lat / 1000  # Convert to seconds
+                latency_data[wl][be] = lat / 1000 
     
     if latency_data:
         out.append('<div class="chart-container">')
@@ -962,7 +962,7 @@ def generate_charts_section(rows: List[Dict[str, Any]]) -> str:
         ))
         out.append('</div>')
     
-    # Throughput chart
+  
     throughput_data: Dict[str, Dict[str, float]] = {}
     for wl, backends in latest.items():
         throughput_data[wl] = {}
@@ -983,7 +983,7 @@ def generate_charts_section(rows: List[Dict[str, Any]]) -> str:
     return '\n'.join(out)
 
 
-# Helper to show cost only for OpenAI (where it's actually tracked)
+
 def fmt_cost_if_real(r: Dict[str, Any]) -> str:
     cost = r.get("cost")
     backend = r.get("backend", "")
@@ -998,7 +998,7 @@ def fmt_cost_per_1m_if_real(r: Dict[str, Any]) -> str:
         return fmt_cost(cost)
     return "-"
 
-# Define ALL columns for the full table (includes TTFT for streaming backends)
+
 FULL_TABLE_COLUMNS = [
     ("run_dir", "Run", lambda r: f'<code>{html.escape(str(r.get("run_dir", ""))[:25])}</code>'),
     ("ts", "Timestamp (UTC)", lambda r: html.escape((r.get("ts", "") or "")[:19].replace("T", " "))),
@@ -1061,7 +1061,7 @@ def generate_full_table(title: str, table_rows: List[Dict[str, Any]], table_id: 
 
 def generate_workload_tables(rows: List[Dict[str, Any]]) -> str:
     """Generate separate tables for each workload category."""
-    # Group by workload
+    
     by_workload: Dict[str, List[Dict[str, Any]]] = {}
     for r in rows:
         wl = r.get("workload", "unknown")
@@ -1110,7 +1110,7 @@ def generate_per_sample_results(results_dir: Path) -> str:
         if not samples:
             continue
         
-        # Count correct/incorrect
+        
         correct = sum(1 for s in samples if s.get("correct", False))
         total = len(samples)
         
@@ -1177,12 +1177,12 @@ def main() -> int:
             cost = cost_stats(run_dir / "samples.jsonl")
             ttft_mean, gen_mean = timing_stats(run_dir / "samples.jsonl")
             
-            # Calculate derived metrics
+            
             lat_mean = safe_float(metrics.get("latency_ms_mean"))
             lat_std = safe_float(metrics.get("latency_ms_std"))
             lat_cv = (lat_std / lat_mean * 100) if lat_mean and lat_std else None
             
-            # Token throughput metrics
+            
             n = safe_float(metrics.get("n")) or 1
             total_time_s = (lat_mean * n / 1000) if lat_mean else None
             toks_total = (total / total_time_s) if total and total_time_s else None
@@ -1190,16 +1190,12 @@ def main() -> int:
             ms_per_tok_total = (1000 / toks_total) if toks_total else None
             ms_per_tok_out = (1000 / toks_out) if toks_out else None
             
-            # Cost per 1M tokens
+        
             cost_per_1m = (cost / total * 1_000_000) if cost and total else None
 
-            # Extract workload with dataset source from run_dir name
-            # e.g., "openai_reasoning_toy" -> "reasoning", dataset_source = "toy"
-            # e.g., "openai_math_gsm8k" -> "math", dataset_source = "gsm8k"
             workload_base = cfg.get("workload", "")
             run_name = run_dir.name
             
-            # Try to extract dataset source from run_dir name
             dataset_source = ""
             known_sources = ["toy", "gsm8k", "boolq", "xsum", "cnn", "logiqa", "ner"]
             for src in known_sources:
@@ -1207,7 +1203,6 @@ def main() -> int:
                     dataset_source = src
                     break
             
-            # Create descriptive workload name for comparison tables
             workload_with_source = f"{workload_base} ({dataset_source})" if dataset_source else workload_base
             
             rows.append({
@@ -1215,8 +1210,8 @@ def main() -> int:
                 "ts": ts,
                 "backend": cfg.get("backend", ""),
                 "backend_model": cfg.get("backend_model", ""),
-                "workload": workload_base,  # Keep base for grouping
-                "workload_full": workload_with_source,  # Full name with dataset source
+                "workload": workload_base,  
+                "workload_full": workload_with_source,  
                 "n": metrics.get("n", ""),
                 "lat_mean": metrics.get("latency_ms_mean"),
                 "lat_p50": metrics.get("latency_ms_p50"),
@@ -1246,7 +1241,6 @@ def main() -> int:
         except Exception as e:
             print(f"Warning: skipping {run_dir.name}: {e}", file=sys.stderr)
 
-    # Sort by timestamp
     rows_sorted = sorted(rows, key=lambda r: r.get("ts", "") or "0000", reverse=True)
     latest_rows = rows_sorted[:args.latest]
 

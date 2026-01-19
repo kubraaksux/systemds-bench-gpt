@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 import argparse
 import csv
 import json
@@ -30,7 +30,7 @@ def iter_run_dirs(results_dir: Path) -> Iterable[Path]:
 
     seen = set()
 
-    # Direct children
+    # direct children
     for p in results_dir.iterdir():
         if is_run_dir(p):
             rp = p.resolve()
@@ -38,7 +38,7 @@ def iter_run_dirs(results_dir: Path) -> Iterable[Path]:
                 seen.add(rp)
                 yield p
 
-    # One-level nesting
+    # one level nesting
     for group in results_dir.iterdir():
         if not group.is_dir():
             continue
@@ -153,17 +153,17 @@ def ttft_stats(samples_path: Path) -> Tuple[Optional[float], Optional[float]]:
                 except Exception:
                     continue
 
-                # Check top-level first (new format), then extra dict (backward compat)
+                # check top level first (new format), then extra dict (backward compat)
                 ttft = obj.get("ttft_ms")
                 gen = obj.get("generation_ms")
                 
                 if ttft is None:
-                    # Fall back to extra dict
+                    # fall back to extra dict
                     extra = obj.get("extra") or {}
                     ttft = extra.get("ttft_ms")
                     gen = extra.get("generation_ms")
 
-                # Only count samples that have TTFT metrics
+                # only count samples that have TTFT metrics
                 if ttft is not None:
                     total_ttft += float(ttft)
                     if gen is not None:
@@ -253,19 +253,19 @@ def main() -> int:
                 total, avg, total_in, total_out = token_stats(run_dir / "samples.jsonl")
                 ttft_mean, gen_mean = ttft_stats(run_dir / "samples.jsonl")
 
-                # Get accuracy from metrics.json (stored by runner)
+                # get accuracy from metrics.json (stored by runner)
                 accuracy_mean = metrics.get("accuracy_mean")
                 accuracy_count = metrics.get("accuracy_count", "")
                 
-                # Get cost from metrics.json
+                # get cost from metrics.json
                 cost_total = metrics.get("cost_total_usd")
                 cost_per_1m = metrics.get("cost_per_1m_tokens")
                 
-                # Get resource usage metrics
+                # get resource usage metrics
                 memory_mb_peak = metrics.get("memory_mb_peak")
                 cpu_percent_avg = metrics.get("cpu_percent_avg")
                 
-                # Get latency variance metrics
+                # get latency variance metrics
                 lat_std = metrics.get("latency_ms_std")
                 lat_min = metrics.get("latency_ms_min")
                 lat_max = metrics.get("latency_ms_max")

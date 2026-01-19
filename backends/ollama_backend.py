@@ -181,11 +181,11 @@ class OllamaBackend:
         
         total_latency_ms = (t1 - t0) * 1000.0
         
-        # Get token counts if available
+        # get token counts if available
         in_tokens = data.get("prompt_eval_count", len(prompt) // 4)
         out_tokens = data.get("eval_count", len(text) // 4)
         
-        # Estimate compute cost based on typical consumer GPU (~$0.30/hr equivalent)
+        # estimate compute cost based on typical consumer GPU (~$0.30/hr equivalent)
         compute_hours = total_latency_ms / 1000.0 / 3600.0
         
         return {

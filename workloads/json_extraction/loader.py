@@ -9,9 +9,9 @@ from datasets import load_dataset
 @dataclass
 class Sample:
     sid: str
-    text: str           # The input text snippet
-    schema: str         # The expected JSON schema/fields description
-    reference: str      # The correct JSON as a string
+    text: str          
+    schema: str         
+    reference: str    
 
 
 # Toy dataset as fallback
