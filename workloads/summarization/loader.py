@@ -9,7 +9,7 @@ from datasets import load_dataset
 class Sample:
     sid: str
     text: str
-    reference: str  # The reference summary (or original text for toy)
+    reference: str  # the reference summary (or original text for toy)
 
 
 TOY_TEXTS = [
@@ -54,7 +54,7 @@ def _load_toy_samples(n: int) -> List[Sample]:
     texts = TOY_TEXTS[: max(1, min(n, len(TOY_TEXTS)))]
     samples: List[Sample] = []
     for i, t in enumerate(texts):
-        # Use original text as reference for quality comparison
+        # use original text as reference for quality comparison
         samples.append(Sample(sid=f"toy-{i}", text=t, reference=t))
     return samples
 
@@ -76,7 +76,7 @@ def _load_cnn_samples(n: int) -> List[Sample]:
         article = item["article"]
         highlights = item["highlights"]
         
-        # Skip very long articles (>2000 chars) for practical inference
+        # skip very long articles (>2000 chars) for practical inference
         if len(article) > 2000:
             continue
         
@@ -106,7 +106,7 @@ def _load_xsum_samples(n: int) -> List[Sample]:
         document = item["document"]
         summary = item["summary"]
         
-        # Skip very long documents (>2000 chars)
+        # skip very long documents (>2000 chars)
         if len(document) > 2000:
             continue
         
@@ -121,10 +121,10 @@ def _load_xsum_samples(n: int) -> List[Sample]:
 
 def tokenize(text: str) -> Set[str]:
     """Simple word tokenization for overlap calculation."""
-    # Lowercase, remove punctuation, split into words
+    # lowercase, remove punctuation, split into words
     text = text.lower()
     words = re.findall(r'\b[a-z]+\b', text)
-    # Remove common stop words
+    # remove common stop words
     stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 
                   'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
                   'it', 'this', 'that', 'they', 'can', 'may', 'by', 'as'}
@@ -159,33 +159,33 @@ def accuracy_check(prediction: str, reference: str) -> bool:
     pred_len = len(prediction)
     ref_len = len(reference)
     
-    # Check 1: Output shouldn't be empty or too short
+    # check 1: Output shouldn't be empty or too short
     if pred_len < 20:
         return False
     
-    # Check 2: Output shouldn't be excessively long
-    # For summarization, allow generous length variation
-    # Just ensure the output isn't absurdly long (>5x reference)
+    # check 2: Output shouldn't be excessively long
+    # for summarization, allow generous length variation
+    # just ensure the output isn't absurdly long (>5x reference)
     if pred_len > max(ref_len * 5, 500):
         return False
     
-    # Check 3: Key term overlap - very lenient for real datasets
-    # Models often use synonyms/paraphrases which is perfectly valid
+    # check 3: Key term overlap - very lenient for real datasets
+    # models often use synonyms/paraphrases which is perfectly valid
     ref_terms = tokenize(reference)
     pred_terms = tokenize(prediction)
     
     if ref_terms and len(ref_terms) >= 5:
         overlap = ref_terms.intersection(pred_terms)
-        # Only require ~10% overlap since paraphrasing is common
-        # If overlap is 0, that's suspicious
+        # only require ~10% overlap since paraphrasing is common
+        # if overlap is 0, that's suspicious
         if len(overlap) == 0:
             return False
     
-    # Check 4: Basic coherence - should have proper sentence structure
+    # check 4: Basic coherence - should have proper sentence structure
     if pred_len > 50 and not re.search(r'[.!?]', prediction):
         return False
     
-    # Check 5: Prediction should have meaningful content
+    # check 5: Prediction should have meaningful content
     if len(pred_terms) < 3:
         return False
     

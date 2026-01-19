@@ -126,10 +126,10 @@ systemds-bench-gpt/
 │   ├── vllm_backend.py     # vLLM server adapter
 │   └── mlx_backend.py      # Apple Silicon MLX
 ├── workloads/
-│   ├── math/               # GSM8K math problems
-│   ├── summarization/      # XSum summarization
-│   ├── reasoning/          # BoolQ reasoning
-│   └── json_extraction/    # NER/structured extraction
+│   ├── math/               # GSM8K dataset (HuggingFace)
+│   ├── summarization/      # XSum dataset (HuggingFace)
+│   ├── reasoning/          # BoolQ dataset (HuggingFace)
+│   └── json_extraction/    # Curated toy dataset (reliable ground truth)
 ├── scripts/
 │   ├── aggregate.py        # CSV aggregation
 │   └── report.py           # HTML report generation
@@ -203,6 +203,25 @@ Following research methodology from ["Unlocking the Potential of Speculative Dec
 | **Input tokens** | Prompt tokens sent |
 | **Output tokens** | Tokens generated |
 | **Total tokens** | Sum of input + output |
+
+---
+
+## Datasets
+
+| Workload | Dataset | Source | Samples |
+|----------|---------|--------|---------|
+| **Math** | GSM8K | HuggingFace `openai/gsm8k` | 10 (configurable) |
+| **Reasoning** | BoolQ | HuggingFace `google/boolq` | 10 (configurable) |
+| **Summarization** | XSum | HuggingFace `EdinburghNLP/xsum` | 10 (configurable) |
+| **JSON Extraction** | Curated toy | Built-in | 10 |
+
+**Why JSON extraction uses a toy dataset:**
+- Real JSON datasets (CoNLL-2003 NER, etc.) have inconsistent ground truth
+- Toy dataset has clean, verifiable field values for exact accuracy checking
+- Enables meaningful accuracy comparison between backends (OpenAI: 90%, local: 60-80%)
+- HuggingFace alternatives available via config: `source: ner` or `source: json_struct`
+
+**Fallback behavior:** All loaders include toy datasets as fallback if HuggingFace download fails.
 
 ---
 

@@ -1,6 +1,6 @@
 name: math
 
-# Available sources: toy (built-in), gsm8k (GSM8K dataset)
+# available sources: toy (built-in), gsm8k (GSM8K dataset)
 dataset:
   source: gsm8k
   n_samples: 10

@@ -9,10 +9,10 @@ from datasets import load_dataset
 class Sample:
     sid: str
     question: str
-    reference: str  # The final numerical answer
+    reference: str  
 
 
-# Toy problems for quick testing
+# toy problems for quick testing
 TOY_PROBLEMS = [
     {"question": "What is 15 + 27?", "answer": "42"},
     {"question": "A baker has 48 cupcakes. She sells 23. How many are left?", "answer": "25"},
@@ -77,8 +77,8 @@ def _load_gsm8k_samples(n: int) -> List[Sample]:
         question = item["question"]
         answer_text = item["answer"]
         
-        # GSM8K answers are formatted as step-by-step solution ending with #### final_answer
-        # Extract the final numerical answer after ####
+        # gSM8K answers are formatted as step-by-step solution ending with #### final_answer
+        # extract the final numerical answer after ####
         final_answer = extract_gsm8k_answer(answer_text)
         
         if final_answer is not None:
@@ -98,10 +98,10 @@ def extract_gsm8k_answer(answer_text: str) -> Optional[str]:
     GSM8K answers end with "#### <number>"
     Example: "...The answer is #### 42"
     """
-    # Look for #### followed by the answer
+    # look for #### followed by the answer
     match = re.search(r'####\s*([0-9,.\-]+)', answer_text)
     if match:
-        # Remove commas from numbers like "1,000"
+        # remove commas from numbers like "1,000"
         return match.group(1).replace(',', '')
     return None
 
@@ -114,7 +114,7 @@ def extract_number_from_response(text: str) -> Optional[str]:
     main answer. We need to find the FIRST complete answer, not the last number.
     
     Strategies (in order of priority):
-    1. Look for explicit answer patterns ("the answer is X", "#### X") - take FIRST match
+    1. Look for explicit answer patterns ("the answer is X", "#### x") - take FIRST match
     2. Look for bolded/boxed answers (**X**, \\boxed{X})
     3. Look for "= X" patterns (calculation results)
     4. Take the last standalone number in the response (fallback only)
@@ -124,16 +124,16 @@ def extract_number_from_response(text: str) -> Optional[str]:
     
     text = text.strip()
     
-    # Helper to clean number string (remove trailing periods, commas)
+    # helper to clean number string (remove trailing periods, commas)
     def clean_num(s: str) -> str:
         s = s.replace(',', '').strip()
-        # Remove trailing period if it's not a decimal
+        # remove trailing period if it's not a decimal
         if s.endswith('.') and s.count('.') == 1:
             s = s[:-1]
         return s
     
-    # Check if text contains follow-up exercises (phi-2 pattern)
-    # If so, only look at text before "Follow-up" or similar markers
+    # check if text contains follow-up exercises (phi-2 pattern)
+    # if so, only look at text before "Follow-up" or similar markers
     main_answer_text = text
     follow_up_markers = [
         r'\bFollow-up\b', r'\bBonus\b', r'\bExtra\b', r'\bNext\b.*\bproblem\b',
@@ -146,10 +146,10 @@ def extract_number_from_response(text: str) -> Optional[str]:
             main_answer_text = text[:match.start()]
             break
     
-    # Strategy 1: Look for explicit "answer is" patterns (highest priority)
-    # Take the FIRST match in the main answer section (not follow-ups)
+    # strategy 1: Look for explicit "answer is" patterns (highest priority)
+    # take the FIRST match in the main answer section (not follow-ups)
     answer_patterns = [
-        r'####\s*\$?([0-9,]+(?:\.[0-9]+)?)',  # GSM8K format: #### 42
+        r'####\s*\$?([0-9,]+(?:\.[0-9]+)?)',  # gSM8K format: #### 42
         r'(?:the\s+)?(?:final\s+)?answer\s*(?:is|=|:)[:\s]*\$?([0-9,]+(?:\.[0-9]+)?)',
         r'[Aa]nswer[:\s]+[A-Za-z\s]*\$?([0-9,]+(?:\.[0-9]+)?)',  # "Answer: Janet makes $18"
         r'takes?\s+(\d+)\s+(?:bolts?|cups?|items?|pieces?)\s+(?:in\s+total|total)',  # "takes 3 bolts in total"
@@ -159,55 +159,55 @@ def extract_number_from_response(text: str) -> Optional[str]:
     for pattern in answer_patterns:
         matches = re.findall(pattern, main_answer_text, re.IGNORECASE)
         if matches:
-            # Take the FIRST match (main answer, not follow-up)
+            # take the FIRST match (main answer, not follow-up)
             return clean_num(matches[0])
     
-    # Strategy 2: Look for bolded/boxed answers (common LLM format)
+    # strategy 2: Look for bolded/boxed answers (common LLM format)
     bold_patterns = [
         r'\*\*\$?([0-9,]+(?:\.[0-9]+)?)(?:\s*[a-zA-Z]*)?\*\*',  # **45** or **45 miles** or **$45**
-        r'\\boxed\{([0-9,]+(?:\.[0-9]+)?)\}',  # LaTeX boxed
+        r'\\boxed\{([0-9,]+(?:\.[0-9]+)?)\}',  # laTeX boxed
     ]
     
     for pattern in bold_patterns:
         matches = re.findall(pattern, main_answer_text, re.IGNORECASE)
         if matches:
-            # Take the first bolded number
+            # take the first bolded number
             return clean_num(matches[0])
     
-    # Strategy 3: Look for "= X" at end of lines - check LAST lines first (final answer)
+    # strategy 3: Look for "= X" at end of lines - check LAST lines first (final answer)
     lines = main_answer_text.split('\n')
-    # Check last 5 lines first for "= $X" pattern
+    # check last 5 lines first for "= $X" pattern
     for line in reversed(lines[-5:]):
-        # Look for "= $X" or "= X" patterns that end sentences  
+        # look for "= $X" or "= X" patterns that end sentences  
         match = re.search(r'=\s*\$?([0-9,]+(?:\.[0-9]+)?)\s*(?:/day|/week|per\s+\w+)?\s*[.!?]?\s*$', line.strip())
         if match:
             return clean_num(match.group(1))
     
-    # Strategy 4: Look for specific final answer patterns
+    # strategy 4: Look for specific final answer patterns
     # "So, Josh made a profit of $70,000" or "earnings for this week are $460"
     final_patterns = [
         r'(?:profit|earnings|total|made|earned|is|are)\s+(?:of\s+)?\$([0-9,]+(?:\.[0-9]+)?)',  # profit of $70,000
         r'\$([0-9,]+(?:\.[0-9]+)?)\s*[.!]?\s*$',  # ends with $X
     ]
     
-    # Look in the last few lines first (where final answer usually is)
+    # look in the last few lines first (where final answer usually is)
     last_lines = '\n'.join(main_answer_text.strip().split('\n')[-5:])
     for pattern in final_patterns:
         matches = re.findall(pattern, last_lines, re.IGNORECASE)
         if matches:
             return clean_num(matches[-1])
     
-    # Strategy 5: Look for currency amounts in the full answer
+    # strategy 5: Look for currency amounts in the full answer
     currency_matches = re.findall(r'\$([0-9,]+(?:\.[0-9]+)?)', main_answer_text)
     if currency_matches:
         return clean_num(currency_matches[-1])
     
-    # Strategy 5: Look for the last number followed by period/end (sentence-ending number)
+    # strategy 5: Look for the last number followed by period/end (sentence-ending number)
     matches = re.findall(r'\b([0-9,]+(?:\.[0-9]+)?)\s*[.!?]?\s*$', main_answer_text, re.MULTILINE)
     if matches:
         return clean_num(matches[-1])
     
-    # Final fallback: any number (take the last one from main text)
+    # final fallback: any number (take the last one from main text)
     numbers = re.findall(r'\b([0-9,]+(?:\.[0-9]+)?)\b', main_answer_text)
     if numbers:
         return clean_num(numbers[-1])
@@ -223,7 +223,7 @@ def normalize_number(num_str: str) -> Optional[float]:
     if not num_str:
         return None
     try:
-        # Remove commas and whitespace
+        # remove commas and whitespace
         num_str = num_str.replace(',', '').strip()
         return float(num_str)
     except ValueError:
@@ -247,17 +247,17 @@ def accuracy_check(prediction: str, reference: str) -> bool:
     if not prediction or not reference:
         return False
     
-    # Extract number from prediction
+    # extract number from prediction
     pred_num_str = extract_number_from_response(prediction)
     if pred_num_str is None:
         return False
     
-    # Normalize both numbers for comparison
+    # normalize both numbers for comparison
     pred_num = normalize_number(pred_num_str)
     ref_num = normalize_number(reference)
     
     if pred_num is None or ref_num is None:
         return False
     
-    # Exact match (with small tolerance for floating point)
+    # exact match (with small tolerance for floating point)
     return abs(pred_num - ref_num) < 1e-6

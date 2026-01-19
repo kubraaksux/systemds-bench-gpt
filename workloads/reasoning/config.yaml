@@ -1,6 +1,6 @@
 name: reasoning
 
-# Available sources: toy (built-in), logiqa (LogiQA), boolq (BoolQ)
+# available sources: toy (built-in), logiqa (LogiQA), boolq (BoolQ)
 dataset:
   source: boolq
   n_samples: 10

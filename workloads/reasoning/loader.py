@@ -8,14 +8,14 @@ from datasets import load_dataset
 @dataclass
 class Sample:
     sid: str
-    puzzle: str       # The logic puzzle/problem
-    puzzle_type: str  # Type of reasoning required
-    reference: str    # The correct answer
+    puzzle: str       # the logic puzzle/problem
+    puzzle_type: str  # type of reasoning required
+    reference: str    # the correct answer
 
 
-# Toy dataset as fallback
+# toy dataset as fallback
 TOY_DATASET = [
-    # Sequence puzzles
+    # sequence puzzles
     {
         "id": "seq-1",
         "type": "sequence",
@@ -38,7 +38,7 @@ TOY_DATASET = [
         "explanation": "Each number is multiplied by 3. 81 × 3 = 243"
     },
     
-    # Pattern recognition
+    # pattern recognition
     {
         "id": "pat-1",
         "type": "pattern",
@@ -54,7 +54,7 @@ TOY_DATASET = [
         "explanation": "The code reverses the letters. ORANGE reversed is EGNARO"
     },
     
-    # Deductive reasoning
+    # deductive reasoning
     {
         "id": "ded-1",
         "type": "deductive",
@@ -77,7 +77,7 @@ TOY_DATASET = [
         "explanation": "Tom > Jerry > Spike, so Spike is shortest"
     },
     
-    # Mathematical reasoning
+    # mathematical reasoning
     {
         "id": "math-1",
         "type": "mathematical",
@@ -152,11 +152,11 @@ def _load_logiqa_samples(n: int) -> List[Sample]:
         options = item["options"]
         label = item["correct_option"]  # 0-3 index
         
-        # Format as multiple choice
+        # format as multiple choice
         options_text = "\n".join([f"{chr(65+j)}. {opt}" for j, opt in enumerate(options)])
         puzzle = f"{context}\n\nQuestion: {question}\n\nOptions:\n{options_text}\n\nAnswer with just the letter (A, B, C, or D)."
         
-        # Reference is the correct letter
+        # reference is the correct letter
         reference = chr(65 + label)
         
         samples.append(Sample(
@@ -185,7 +185,7 @@ def _load_boolq_samples(n: int) -> List[Sample]:
         
         passage = item["passage"]
         question = item["question"]
-        answer = item["answer"]  # True/False
+        answer = item["answer"]  # true/False
         
         puzzle = f"Passage: {passage}\n\nQuestion: {question}\n\nAnswer with just 'Yes' or 'No'."
         reference = "Yes" if answer else "No"
@@ -209,7 +209,7 @@ def normalize_answer(answer: str) -> str:
     """
     answer = answer.lower().strip()
     
-    # Remove common answer prefixes
+    # remove common answer prefixes
     prefixes = [
         "the answer is",
         "answer:",
@@ -225,7 +225,7 @@ def normalize_answer(answer: str) -> str:
         if answer.startswith(prefix):
             answer = answer[len(prefix):].strip()
     
-    # Remove trailing punctuation
+    # remove trailing punctuation
     answer = answer.rstrip(".,!?")
     
     return answer
@@ -243,12 +243,12 @@ def extract_answer_from_prediction(prediction: str) -> Optional[str]:
     """
     prediction = prediction.strip()
     
-    # Strategy 1: GSM8K-style "#### answer" format
+    # strategy 1: GSM8K-style "#### answer" format
     match = re.search(r"####\s*(.+?)$", prediction, re.MULTILINE)
     if match:
         return match.group(1).strip()
     
-    # Strategy 2: "the answer is X" or "answer: X" patterns
+    # strategy 2: "the answer is X" or "answer: X" patterns
     patterns = [
         r"(?:the\s+)?(?:final\s+)?answer\s+is[:\s]+([^\n.]+)",
         r"(?:the\s+)?(?:final\s+)?answer[:\s]+([^\n.]+)",
@@ -263,22 +263,22 @@ def extract_answer_from_prediction(prediction: str) -> Optional[str]:
         if match:
             return match.group(1).strip()
     
-    # Strategy 3: LaTeX boxed format
+    # strategy 3: LaTeX boxed format
     match = re.search(r"\\boxed\{([^}]+)\}", prediction)
     if match:
         return match.group(1).strip()
     
-    # Strategy 4: Bold markdown answer
+    # strategy 4: Bold markdown answer
     match = re.search(r"\*\*([^*]+)\*\*\s*$", prediction, re.MULTILINE)
     if match:
         return match.group(1).strip()
     
-    # Strategy 5: Last line that looks like an answer
+    # strategy 5: Last line that looks like an answer
     lines = prediction.strip().split('\n')
     for line in reversed(lines):
         line = line.strip()
         if line and len(line) < 100 and not line.startswith('#'):
-            # Check if it's a standalone answer-like line
+            # check if it's a standalone answer-like line
             if re.match(r"^[\w\s\-\',]+$", line) or re.match(r"^\d+$", line):
                 return line
     
@@ -296,28 +296,28 @@ def accuracy_check(prediction: str, reference: str) -> bool:
     Returns:
         True if the answer matches, False otherwise
     """
-    # Extract the answer from the prediction
+    # extract the answer from the prediction
     pred_answer = extract_answer_from_prediction(prediction)
     
     if pred_answer is None:
-        # Fallback: check if reference appears in prediction
+        # fallback: check if reference appears in prediction
         return normalize_answer(reference) in normalize_answer(prediction)
     
-    # Normalize both for comparison
+    # normalize both for comparison
     pred_normalized = normalize_answer(pred_answer)
     ref_normalized = normalize_answer(reference)
     
-    # Exact match
+    # exact match
     if pred_normalized == ref_normalized:
         return True
     
-    # Check if one contains the other (for answers like "5 cents" vs "5")
+    # check if one contains the other (for answers like "5 cents" vs "5")
     if ref_normalized in pred_normalized or pred_normalized in ref_normalized:
         return True
     
-    # Try numeric comparison for number answers
+    # try numeric comparison for number answers
     try:
-        # Extract numbers from both
+        # extract numbers from both
         pred_nums = re.findall(r'-?\d+(?:\.\d+)?', pred_normalized)
         ref_nums = re.findall(r'-?\d+(?:\.\d+)?', ref_normalized)
         

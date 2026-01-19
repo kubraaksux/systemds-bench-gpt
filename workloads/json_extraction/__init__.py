@@ -1,1 +1,1 @@
-# JSON extraction workload for structured generation benchmarking
+# jSON extraction workload for structured generation benchmarking

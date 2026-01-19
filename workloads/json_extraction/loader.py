@@ -14,7 +14,7 @@ class Sample:
     reference: str    
 
 
-# Toy dataset as fallback
+# toy dataset as fallback
 TOY_DATASET = [
     {
         "id": "person-1",
@@ -281,8 +281,8 @@ def _load_ner_samples(n: int) -> List[Sample]:
             print(f"Warning: Could not load CoNLL-2003 dataset, falling back to toy data. Error: {e2}")
             return _load_toy_samples(n)
     
-    # NER tag mapping for CoNLL-2003
-    # Tags: O, B-PER, I-PER, B-ORG, I-ORG, B-LOC, I-LOC, B-MISC, I-MISC
+    # nER tag mapping for CoNLL-2003
+    # tags: O, B-PER, I-PER, B-ORG, I-ORG, B-LOC, I-LOC, B-MISC, I-MISC
     tag_names = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"]
     
     samples: List[Sample] = []
@@ -293,10 +293,10 @@ def _load_ner_samples(n: int) -> List[Sample]:
         tokens = item["tokens"]
         ner_tags = item["ner_tags"]
         
-        # Reconstruct text
+        # reconstruct text
         text = " ".join(tokens)
         
-        # Extract entities
+        # extract entities
         entities = {"persons": [], "organizations": [], "locations": [], "misc": []}
         current_entity = []
         current_type = None
@@ -305,7 +305,7 @@ def _load_ner_samples(n: int) -> List[Sample]:
             tag = tag_names[tag_id]
             
             if tag.startswith("B-"):
-                # Save previous entity if exists
+                # ave previous entity if exists
                 if current_entity and current_type:
                     entity_text = " ".join(current_entity)
                     if current_type == "PER":
@@ -317,14 +317,14 @@ def _load_ner_samples(n: int) -> List[Sample]:
                     else:
                         entities["misc"].append(entity_text)
                 
-                # Start new entity
+                # start new entity
                 current_entity = [token]
-                current_type = tag[2:]  # Remove "B-" prefix
+                current_type = tag[2:]  # remove "B-" prefix
             elif tag.startswith("I-") and current_type == tag[2:]:
-                # Continue current entity
+                # continue current entity
                 current_entity.append(token)
             else:
-                # End current entity
+                # end current entity
                 if current_entity and current_type:
                     entity_text = " ".join(current_entity)
                     if current_type == "PER":
@@ -338,7 +338,7 @@ def _load_ner_samples(n: int) -> List[Sample]:
                 current_entity = []
                 current_type = None
         
-        # Don't forget last entity
+        # don't forget last entity
         if current_entity and current_type:
             entity_text = " ".join(current_entity)
             if current_type == "PER":
@@ -350,7 +350,7 @@ def _load_ner_samples(n: int) -> List[Sample]:
             else:
                 entities["misc"].append(entity_text)
         
-        # Skip samples with no entities
+        # skip samples with no entities
         if not any(entities.values()):
             continue
         
@@ -378,13 +378,13 @@ def extract_json_from_prediction(prediction: str) -> Optional[Dict[str, Any]]:
     """
     prediction = prediction.strip()
     
-    # Strategy 1: Try parsing the entire response
+    # strategy 1: Try parsing the entire response
     try:
         return json.loads(prediction)
     except json.JSONDecodeError:
         pass
     
-    # Strategy 2: Look for JSON in markdown code block
+    # strategy 2: Look for JSON in markdown code block
     code_block_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", prediction, re.DOTALL)
     if code_block_match:
         try:
@@ -392,7 +392,7 @@ def extract_json_from_prediction(prediction: str) -> Optional[Dict[str, Any]]:
         except json.JSONDecodeError:
             pass
     
-    # Strategy 3: Find JSON object pattern
+    # strategy 3: Find JSON object pattern
     json_match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", prediction, re.DOTALL)
     if json_match:
         try:
@@ -422,22 +422,22 @@ def _normalize_value(val) -> str:
 
 def _values_match(pred_val, ref_val) -> bool:
     """Check if two values match (with some tolerance)."""
-    # Normalize both values
+    # normalize both values
     pred_norm = _normalize_value(pred_val)
     ref_norm = _normalize_value(ref_val)
     
-    # Exact match after normalization
+    # exact match after normalization
     if pred_norm == ref_norm:
         return True
     
-    # For strings, check if one contains the other (handles "Dr. Maria Garcia" vs "Maria Garcia")
+    # for strings, check if one contains the other (handles "Dr. Maria Garcia" vs "Maria Garcia")
     if isinstance(ref_val, str) and isinstance(pred_val, str):
         ref_lower = ref_val.lower().strip()
         pred_lower = pred_val.lower().strip()
         if ref_lower in pred_lower or pred_lower in ref_lower:
             return True
     
-    # For numbers, allow small tolerance
+    # for numbers, allow small tolerance
     if isinstance(ref_val, (int, float)) and isinstance(pred_val, (int, float)):
         if ref_val == 0:
             return pred_val == 0
@@ -466,27 +466,27 @@ def accuracy_check(prediction: str, reference: str) -> bool:
     Returns:
         True if valid JSON with >= 90% correct field values, False otherwise
     """
-    # Parse the reference to get expected fields
+    # parse the reference to get expected fields
     try:
         ref_dict = json.loads(reference)
     except json.JSONDecodeError:
         return False
     
-    # Extract JSON from prediction
+    # extract JSON from prediction
     pred_dict = extract_json_from_prediction(prediction)
     
     if pred_dict is None:
         return False
     
-    # Check if all required fields are present
+    # check if all required fields are present
     required_fields = set(ref_dict.keys())
     present_fields = set(pred_dict.keys())
     
-    # All required fields must be present
+    # all required fields must be present
     if not required_fields.issubset(present_fields):
         return False
     
-    # Count matching values - use STRICT matching
+    # count matching values - use STRICT matching
     matches = 0
     total = len(ref_dict)
     
@@ -495,7 +495,7 @@ def accuracy_check(prediction: str, reference: str) -> bool:
         if _values_match_strict(pred_val, ref_val):
             matches += 1
     
-    # Require at least 90% of values to match exactly
+    # require at least 90% of values to match exactly
     return (matches / total) >= 0.90
 
 
@@ -505,35 +505,35 @@ def _values_match_strict(pred_val, ref_val) -> bool:
     
     This helps differentiate model quality on the toy dataset.
     """
-    # Normalize both values
+    # normalize both values
     pred_norm = _normalize_value(pred_val)
     ref_norm = _normalize_value(ref_val)
     
-    # Exact match after normalization
+    # exact match after normalization
     if pred_norm == ref_norm:
         return True
     
-    # For strings, require exact match or exact substring (no partial)
+    # for strings, require exact match or exact substring (no partial)
     if isinstance(ref_val, str) and isinstance(pred_val, str):
         ref_lower = ref_val.lower().strip()
         pred_lower = pred_val.lower().strip()
-        # Only allow if prediction exactly equals reference (case-insensitive)
+        # only allow if prediction exactly equals reference (case-insensitive)
         # or if one is a title variant (Dr., Mr., etc.)
         if ref_lower == pred_lower:
             return True
-        # Allow "Dr. Maria Garcia" to match "Maria Garcia" but not vice versa
+        # allow "Dr. Maria Garcia" to match "Maria Garcia" but not vice versa
         if pred_lower.replace("dr. ", "").replace("mr. ", "").replace("ms. ", "") == ref_lower:
             return True
         if ref_lower.replace("dr. ", "").replace("mr. ", "").replace("ms. ", "") == pred_lower:
             return True
         return False
     
-    # For numbers, require exact match (no tolerance)
+    # for numbers, require exact match (no tolerance)
     if isinstance(ref_val, (int, float)) and isinstance(pred_val, (int, float)):
-        # Allow int/float type differences (35 == 35.0)
+        # allow int/float type differences (35 == 35.0)
         return float(pred_val) == float(ref_val)
     
-    # For booleans
+    # for booleans
     if isinstance(ref_val, bool) and isinstance(pred_val, bool):
         return ref_val == pred_val
     

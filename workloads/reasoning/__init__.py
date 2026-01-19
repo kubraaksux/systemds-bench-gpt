@@ -1,1 +1,1 @@
-# Logical reasoning workload for benchmarking step-by-step reasoning capabilities
+# logical reasoning workload for benchmarking step-by-step reasoning capabilities
