@@ -218,14 +218,14 @@ def _load_json_struct_samples(n: int) -> List[Sample]:
             break
         
         try:
-            # The dataset has 'unstructured_text' and 'structured_json' fields
+            # the dataset has 'unstructured_text' and 'structured_json' fields
             text = item.get("unstructured_text", item.get("text", ""))
             structured = item.get("structured_json", item.get("json", ""))
             
             if not text or not structured:
                 continue
             
-            # Parse the structured JSON to extract schema
+            # parse the structured JSON to extract schema
             if isinstance(structured, str):
                 try:
                     parsed = json.loads(structured)
@@ -234,14 +234,14 @@ def _load_json_struct_samples(n: int) -> List[Sample]:
             else:
                 parsed = structured
             
-            # Extract schema from keys
+            # extract schema from keys
             if isinstance(parsed, dict):
                 schema = ", ".join(parsed.keys())
                 reference = json.dumps(parsed, indent=2)
             else:
                 continue
             
-            # Skip if text is too long (>500 chars) for reasonable inference
+            # skip if text is too long (>500 chars) for reasonable inference
             if len(text) > 500:
                 continue
             
@@ -254,7 +254,7 @@ def _load_json_struct_samples(n: int) -> List[Sample]:
         except Exception:
             continue
     
-    # If we didn't get enough samples, supplement with toy data
+    # if we didn't get enough samples, supplement with toy data
     if len(samples) < n:
         print(f"Only got {len(samples)} samples from HuggingFace, supplementing with toy data...")
         toy_samples = _load_toy_samples(n - len(samples))
@@ -270,12 +270,12 @@ def _load_ner_samples(n: int) -> List[Sample]:
     Task: Extract named entities (persons, organizations, locations) from text.
     Falls back to toy dataset if HuggingFace dataset fails.
     """
-    # Try to load CoNLL-2003 dataset
+    # try to load CoNLL-2003 dataset
     try:
         dataset = load_dataset("conll2003", split="test")
     except Exception as e1:
         try:
-            # Try alternate source
+            # try alternate source
             dataset = load_dataset("eriktks/conll2003", split="test")
         except Exception as e2:
             print(f"Warning: Could not load CoNLL-2003 dataset, falling back to toy data. Error: {e2}")

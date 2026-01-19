@@ -442,6 +442,7 @@ This design ensures the benchmark is ready for SystemDS evaluation while providi
 | **Embeddings Workload** | Add similarity/clustering tasks using embedding APIs | Medium |
 | **Hardware Cost Analysis** | Estimate $/query for local backends (electricity, GPU rental) | Medium |
 | **Larger Sample Sizes** | Run benchmarks with n=100+ for statistical significance | Medium |
+| **HuggingFace JSON Datasets** | Switch JSON extraction from toy to CoNLL-2003 NER or larger datasets | Medium |
 | **More Backends** | Hugging Face TGI, llama.cpp, Anthropic Claude | Medium |
 | **Code Generation** | Add programming task benchmark (HumanEval, MBPP) | Medium |
 | **Model Quantization** | Compare 4-bit vs 8-bit vs full precision performance/accuracy | Medium |
