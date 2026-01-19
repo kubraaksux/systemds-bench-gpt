@@ -64,14 +64,15 @@ export OPENAI_API_KEY="your-key-here"
 **Using shell scripts (recommended):**
 
 ```bash
-# Run single benchmark
-./benchmark.sh openai math
-./benchmark.sh ollama reasoning
-./benchmark.sh mlx summarization
-
 # Run all workloads for a backend
-./run_all_benchmarks.sh openai
-./run_all_benchmarks.sh ollama
+./scripts/run_all_benchmarks.sh openai   # OpenAI API
+./scripts/run_all_benchmarks.sh ollama   # Local Ollama
+./scripts/run_all_benchmarks.sh mlx      # Apple Silicon
+./scripts/run_all_benchmarks.sh all      # All backends
+./scripts/run_all_benchmarks.sh          # Local only (ollama + mlx)
+
+# For vLLM (requires GPU): Use Google Colab notebook
+# Open notebooks/vllm_colab.ipynb in Google Colab
 ```
 
 **Using Python directly:**
@@ -136,9 +137,8 @@ systemds-bench-gpt/
 │   └── vllm_colab.ipynb    # Google Colab for vLLM (GPU)
 ├── results/                # Benchmark outputs (gitignored)
 ├── runner.py               # Main benchmark runner
-├── benchmark.sh            # Single benchmark script
-├── run_all_benchmarks.sh   # Run all workloads
 ├── requirements.txt        # Python dependencies
+├── meeting_notes.md        # Project requirements from Matthias
 └── README.md
 ```
 
@@ -224,11 +224,16 @@ python runner.py --backend mlx --model mlx-community/Phi-3-mini-4k-instruct-4bit
 
 | Backend | Model | Workload | Accuracy | Latency (p50) | Cost |
 |---------|-------|----------|----------|---------------|------|
-| OpenAI | gpt-4.1-mini | math | 100% | 4.5s | $0.004 |
-| OpenAI | gpt-4.1-mini | reasoning | 100% | 3.5s | $0.003 |
-| MLX | Phi-3-mini-4bit | math | 20% | 10.0s | $0 |
-| Ollama | llama3.2 | math | 10% | 5.9s | $0 |
-| vLLM | microsoft/phi-2 | reasoning | 70% | 10.2s | $0 |
+| OpenAI | gpt-4.1-mini | math | 100% (10/10) | 4.5s | $0.004 |
+| OpenAI | gpt-4.1-mini | reasoning | 100% (10/10) | 3.5s | $0.003 |
+| OpenAI | gpt-4.1-mini | summarization | 100% (10/10) | 1.3s | $0.001 |
+| OpenAI | gpt-4.1-mini | json_extraction | 100% (10/10) | 1.6s | $0.001 |
+| MLX | Phi-3-mini-4bit | math | 30% (3/10) | 10.0s | $0 |
+| MLX | Phi-3-mini-4bit | summarization | 100% (10/10) | 2.1s | $0 |
+| Ollama | llama3.2 | math | 50% (5/10) | 5.9s | $0 |
+| Ollama | llama3.2 | json_extraction | 100% (10/10) | 1.5s | $0 |
+| vLLM | microsoft/phi-2 | reasoning | 70% (7/10) | 10.4s | $0 |
+| vLLM | microsoft/phi-2 | summarization | 90% (9/10) | 2.4s | $0 |
 
 ---
 
@@ -279,7 +284,39 @@ This benchmark is intended for:
 
 ---
 
+## Key Design Decisions
+
+### Why These Backends?
+- **OpenAI API**: Cloud-based baseline with state-of-the-art accuracy
+- **vLLM**: Industry-standard GPU inference server (as recommended by Prof. Matthias)
+- **MLX**: Apple Silicon local inference (for Macs without NVIDIA GPU)
+- **Ollama**: Easy-to-use local inference for quick testing
+
+### Why These Datasets?
+All datasets are from HuggingFace for reproducibility:
+- **GSM8K**: Standard math reasoning benchmark (openai/gsm8k)
+- **BoolQ**: Binary reading comprehension (google/boolq)
+- **XSum**: News summarization benchmark (EdinburghNLP/xsum)
+- **JSON Extraction**: Toy dataset with clean ground truth
+
+### Metrics Philosophy
+Following the approach of existing benchmarks (MLPerf, etc.):
+- Measure both **accuracy** and **runtime** under controlled workloads
+- Report **multiple latency percentiles** (mean, p50, p95, min, max)
+- Track **resource usage** (memory, CPU) for local backends
+- Calculate **cost efficiency** for cloud APIs
+
+---
+
 ## License
 
 This project is developed as part of the SystemDS research group at TU Berlin.
 License information will be added as the project matures.
+
+---
+
+## Contact
+
+- Student: Kübra Aksux
+- Supervisor: Prof. Dr. Matthias Boehm
+- Project: DIA Project - SystemDS Benchmarking Framework

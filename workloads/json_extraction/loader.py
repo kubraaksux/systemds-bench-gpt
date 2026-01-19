@@ -160,9 +160,10 @@ def load_samples(cfg: Dict[str, Any]) -> List[Sample]:
     """
     Load JSON extraction samples.
     
-    Supports two sources:
-    - "toy": Use built-in toy dataset (10 samples)
+    Supports multiple sources:
+    - "toy": Use built-in toy dataset (10 samples) - clean, reliable ground truth
     - "ner": Use CoNLL-2003 NER dataset from HuggingFace (entities extraction)
+    - "json_struct": Use MasterControlAIML/JSON-Unstructured-Structured from HuggingFace
     """
     dataset_cfg = cfg.get("dataset", {})
     source = dataset_cfg.get("source", "toy")
@@ -172,8 +173,10 @@ def load_samples(cfg: Dict[str, Any]) -> List[Sample]:
         return _load_toy_samples(n)
     elif source == "ner":
         return _load_ner_samples(n)
+    elif source == "json_struct":
+        return _load_json_struct_samples(n)
     else:
-        raise ValueError(f"json_extraction supports source: toy, ner. Got: {source}")
+        raise ValueError(f"json_extraction supports source: toy, ner, json_struct. Got: {source}")
 
 
 def _load_toy_samples(n: int) -> List[Sample]:
@@ -188,6 +191,75 @@ def _load_toy_samples(n: int) -> List[Sample]:
             schema=item["schema"],
             reference=json.dumps(item["reference"], indent=2),
         ))
+    return samples
+
+
+def _load_json_struct_samples(n: int) -> List[Sample]:
+    """
+    Load from MasterControlAIML/JSON-Unstructured-Structured dataset.
+    
+    This dataset contains text with expected JSON structure output.
+    Falls back to toy dataset if loading fails.
+    """
+    try:
+        dataset = load_dataset(
+            "MasterControlAIML/JSON-Unstructured-Structured", 
+            split="train",
+            trust_remote_code=True
+        )
+    except Exception as e:
+        print(f"Warning: Could not load JSON-Unstructured-Structured dataset: {e}")
+        print("Falling back to toy dataset...")
+        return _load_toy_samples(n)
+    
+    samples: List[Sample] = []
+    for i, item in enumerate(dataset):
+        if len(samples) >= n:
+            break
+        
+        try:
+            # The dataset has 'unstructured_text' and 'structured_json' fields
+            text = item.get("unstructured_text", item.get("text", ""))
+            structured = item.get("structured_json", item.get("json", ""))
+            
+            if not text or not structured:
+                continue
+            
+            # Parse the structured JSON to extract schema
+            if isinstance(structured, str):
+                try:
+                    parsed = json.loads(structured)
+                except json.JSONDecodeError:
+                    continue
+            else:
+                parsed = structured
+            
+            # Extract schema from keys
+            if isinstance(parsed, dict):
+                schema = ", ".join(parsed.keys())
+                reference = json.dumps(parsed, indent=2)
+            else:
+                continue
+            
+            # Skip if text is too long (>500 chars) for reasonable inference
+            if len(text) > 500:
+                continue
+            
+            samples.append(Sample(
+                sid=f"json-struct-{i}",
+                text=text,
+                schema=schema,
+                reference=reference,
+            ))
+        except Exception:
+            continue
+    
+    # If we didn't get enough samples, supplement with toy data
+    if len(samples) < n:
+        print(f"Only got {len(samples)} samples from HuggingFace, supplementing with toy data...")
+        toy_samples = _load_toy_samples(n - len(samples))
+        samples.extend(toy_samples)
+    
     return samples
 
 

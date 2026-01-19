@@ -1,9 +1,11 @@
 name: json_extraction
 
-# Available sources: toy (built-in), ner (CoNLL-2003 NER)
-# Note: toy dataset has cleaner ground truth; NER has noisy labels
+# Available sources:
+#   - toy: Built-in 10 samples (people/places/products) - clean ground truth
+#   - json_struct: HuggingFace MasterControlAIML/JSON-Unstructured-Structured
+#   - ner: CoNLL-2003 NER dataset (named entity extraction)
 dataset:
-  source: toy
+  source: toy  # Using toy for reliable accuracy; change to json_struct for HuggingFace
   n_samples: 10
 
 generation:
