@@ -434,17 +434,32 @@ This design ensures the benchmark is ready for SystemDS evaluation while providi
 
 | Feature | Description | Priority |
 |---------|-------------|----------|
-| **Embeddings Workload** | Add similarity/clustering tasks using embedding APIs | High |
 | **Concurrent Testing** | Test throughput under load with multiple simultaneous requests | High |
 | **SystemDS Backend** | Integrate when SystemDS LLM inference is available | High |
-| **Hardware Cost Analysis** | Estimate $/query for local backends based on hardware costs | High |
+| **Real TTFT for All Backends** | Implement streaming mode for MLX/vLLM to measure actual TTFT | High |
+| **GPU Profiling** | GPU memory and utilization via `nvidia-smi` or `pynvml` | High |
+| **Embeddings Workload** | Add similarity/clustering tasks using embedding APIs | Medium |
+| **Hardware Cost Analysis** | Estimate $/query for local backends (electricity, GPU rental) | Medium |
 | **Larger Sample Sizes** | Run benchmarks with n=100+ for statistical significance | Medium |
 | **More Backends** | Hugging Face TGI, llama.cpp, Anthropic Claude | Medium |
 | **Code Generation** | Add programming task benchmark (HumanEval, MBPP) | Medium |
 | **Model Quantization** | Compare 4-bit vs 8-bit vs full precision performance/accuracy | Medium |
-| **Batch Processing** | Compare batch vs. single request performance | Medium |
-| **GPU Profiling** | Detailed GPU memory and utilization tracking | Low |
+| **Accurate Token Counting** | Use actual tokenizer for Ollama/MLX instead of ~4 chars/token | Medium |
+| **Batch Processing** | Compare batch vs. single request performance | Low |
 | **Prompt Optimization** | Test different prompt strategies for each workload | Low |
+
+### Metrics Coverage by Backend
+
+Some metrics are estimated rather than precisely measured:
+
+| Metric | OpenAI | Ollama | MLX | vLLM |
+|--------|--------|--------|-----|------|
+| Latency | ✅ Real | ✅ Real | ✅ Real | ✅ Real |
+| TTFT | ✅ Streaming | ✅ Streaming | ⚠️ ~10% est. | ⚠️ ~10% est. |
+| Token counts | ✅ API | ⚠️ ~4 chars/tok | ⚠️ ~4 chars/tok | ✅ Real |
+| Cost | ✅ API pricing | ⚠️ $0.30/hr est. | ❌ None | ❌ None |
+| Memory/CPU | ✅ Local | ✅ Local | ✅ Local | ⚠️ Remote |
+| GPU metrics | ❌ N/A | ❌ None | ❌ None | ❌ None |
 
 ### Known Limitations
 
@@ -456,7 +471,13 @@ This design ensures the benchmark is ready for SystemDS evaluation while providi
 
 4. **No Quantization Comparison**: Could compare 4-bit vs 8-bit vs full precision models.
 
-5. **No Hardware Cost Estimation**: Local backends show $0 cost, but real hardware has costs (electricity, depreciation). Future work could estimate $/query based on hardware specs.
+5. **No Hardware Cost Estimation**: Local backends show $0 or estimated cost. Real hardware has costs (electricity, depreciation, GPU rental).
+
+6. **No GPU Profiling**: GPU memory and utilization not tracked for any backend. Would require `nvidia-smi` or `pynvml` integration.
+
+7. **TTFT Estimation for Non-Streaming**: MLX and vLLM (non-streaming) estimate TTFT as ~10% of total latency rather than measuring actual first-token time.
+
+8. **Token Estimation for Local Backends**: Ollama and MLX estimate token counts (~4 characters per token) rather than using actual tokenizer.
 
 ---
 
