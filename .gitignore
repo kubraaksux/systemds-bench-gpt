@@ -1,10 +1,42 @@
+# Virtual environment
 .venv/
+venv/
+
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+
+# Results (regenerated per run)
 results/
+
+# Environment and secrets
 .env
+.env.local
+
+# macOS
 .DS_Store
-results_summary.csv
+
+# Generated reports (regenerated with report.py)
 report.html
+benchmark_report.html
+report_*.html
+
+# Temporary/debug files
+*.bak
+*.backup*
+debug*.txt
+*.log
+
+# Aggregated outputs (regenerated)
+*.csv
+aggregated*.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Notes (personal)
 CLAUDE.md
 meeting_notes.md

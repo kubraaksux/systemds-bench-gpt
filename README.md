@@ -267,18 +267,32 @@ python runner.py --backend mlx --model mlx-community/Phi-3-mini-4k-instruct-4bit
 
 ## Sample Results
 
+*Latest benchmark results (n=10 samples per workload):*
+
 | Backend | Model | Workload | Accuracy | Latency (p50) | Cost |
 |---------|-------|----------|----------|---------------|------|
-| OpenAI | gpt-4.1-mini | math | 100% (10/10) | 4.5s | $0.004 |
-| OpenAI | gpt-4.1-mini | reasoning | 100% (10/10) | 3.5s | $0.003 |
-| OpenAI | gpt-4.1-mini | summarization | 100% (10/10) | 1.3s | $0.001 |
-| OpenAI | gpt-4.1-mini | json_extraction | 100% (10/10) | 1.6s | $0.001 |
-| MLX | Phi-3-mini-4bit | math | 30% (3/10) | 10.0s | $0 |
-| MLX | Phi-3-mini-4bit | summarization | 100% (10/10) | 2.1s | $0 |
+| OpenAI | gpt-4.1-mini | math | 100% (10/10) | 4.5s | $0.0044 |
+| OpenAI | gpt-4.1-mini | reasoning | 60% (6/10) | 4.0s | $0.0043 |
+| OpenAI | gpt-4.1-mini | summarization | 100% (10/10) | 1.3s | $0.0015 |
+| OpenAI | gpt-4.1-mini | json_extraction | 100% (10/10) | 1.6s | $0.0014 |
 | Ollama | llama3.2 | math | 50% (5/10) | 5.9s | $0 |
+| Ollama | llama3.2 | reasoning | 50% (5/10) | 4.9s | $0 |
+| Ollama | llama3.2 | summarization | 100% (10/10) | 1.0s | $0 |
 | Ollama | llama3.2 | json_extraction | 100% (10/10) | 1.5s | $0 |
+| vLLM | microsoft/phi-2 | math | 10% (1/10) | 14.8s | $0 |
 | vLLM | microsoft/phi-2 | reasoning | 70% (7/10) | 10.4s | $0 |
 | vLLM | microsoft/phi-2 | summarization | 90% (9/10) | 2.4s | $0 |
+| vLLM | microsoft/phi-2 | json_extraction | 90% (9/10) | 2.1s | $0 |
+| MLX | Phi-3-mini-4bit | math | 30% (3/10) | 10.0s | $0 |
+| MLX | Phi-3-mini-4bit | reasoning | 50% (5/10) | 10.7s | $0 |
+| MLX | Phi-3-mini-4bit | summarization | 100% (10/10) | 2.1s | $0 |
+| MLX | Phi-3-mini-4bit | json_extraction | 40% (4/10) | 5.5s | $0 |
+
+**Key Observations:**
+- **OpenAI** achieves highest accuracy but incurs API costs
+- **Local backends** (Ollama, MLX, vLLM) are free but have lower accuracy on complex tasks
+- **Math** is the hardest task for small models (requires multi-step reasoning)
+- **Summarization** is easiest (all backends achieve 90-100%)
 
 ---
 
@@ -350,6 +364,60 @@ Following the approach of existing benchmarks (MLPerf, etc.):
 - Report **multiple latency percentiles** (mean, p50, p95, min, max)
 - Track **resource usage** (memory, CPU) for local backends
 - Calculate **cost efficiency** for cloud APIs
+
+---
+
+## SystemDS Integration (Planned)
+
+This benchmarking framework is designed to eventually evaluate **SystemDS LLM inference** capabilities when they become available. The current implementation uses existing inference systems (vLLM, Ollama, etc.) as baselines.
+
+### Integration Plan
+
+When SystemDS adds LLM inference support, integration will require:
+
+1. **Create `backends/systemds_backend.py`** implementing the standard interface:
+   ```python
+   class SystemDSBackend:
+       def generate(self, prompts: list, config: dict) -> list:
+           # Connect to SystemDS inference API
+           # Return results with latency, tokens, etc.
+   ```
+
+2. **Run comparative benchmarks** against existing baselines (OpenAI, vLLM)
+
+3. **Analyze performance trade-offs** in terms of:
+   - Inference latency vs. accuracy
+   - Memory efficiency
+   - Integration with SystemDS data pipelines
+
+This design ensures the benchmark is ready for SystemDS evaluation while providing immediate value through existing system comparisons.
+
+---
+
+## Future Work
+
+### Planned Enhancements
+
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| **Embeddings Workload** | Add similarity/clustering tasks using embedding APIs | High |
+| **Concurrent Testing** | Test throughput under load with multiple simultaneous requests | High |
+| **SystemDS Backend** | Integrate when SystemDS LLM inference is available | High |
+| **Larger Sample Sizes** | Run benchmarks with n=100+ for statistical significance | Medium |
+| **More Backends** | Hugging Face TGI, llama.cpp, Anthropic Claude | Medium |
+| **Code Generation** | Add programming task benchmark (HumanEval, MBPP) | Medium |
+| **Batch Processing** | Compare batch vs. single request performance | Low |
+| **GPU Profiling** | Detailed GPU memory and utilization tracking | Low |
+
+### Known Limitations
+
+1. **Sequential Requests Only**: Current implementation processes one request at a time. Real production systems handle concurrent requests.
+
+2. **Small Sample Sizes**: Default n=10 for quick testing. Production benchmarks should use n=100+ for reliable statistics.
+
+3. **Limited Model Variety**: Each backend tested with one model. More comprehensive would test multiple model sizes.
+
+4. **No Quantization Comparison**: Could compare 4-bit vs 8-bit vs full precision models.
 
 ---
 
