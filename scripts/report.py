@@ -689,6 +689,75 @@ def generate_workload_tables(rows: List[Dict[str, Any]]) -> str:
     return '\n'.join(out)
 
 
+def generate_per_sample_results(results_dir: Path) -> str:
+    """Generate expandable per-sample results for debugging."""
+    run_dirs = iter_run_dirs(results_dir)
+    
+    out = ['<h2>Per-Sample Results (Debug)</h2>']
+    out.append('<p class="muted">Click to expand individual predictions for each run.</p>')
+    
+    for run_dir in sorted(run_dirs, key=lambda x: x.name):
+        samples_path = run_dir / "samples.jsonl"
+        if not samples_path.exists():
+            continue
+        
+        run_name = run_dir.name
+        samples = []
+        
+        try:
+            with open(samples_path, 'r') as f:
+                for line in f:
+                    if line.strip():
+                        samples.append(json.loads(line))
+        except Exception:
+            continue
+        
+        if not samples:
+            continue
+        
+        # Count correct/incorrect
+        correct = sum(1 for s in samples if s.get("correct", False))
+        total = len(samples)
+        
+        out.append(f'''
+        <details class="sample-details">
+            <summary>
+                <strong>{html.escape(run_name)}</strong>
+                <span class="sample-count">{correct}/{total} correct</span>
+            </summary>
+            <div class="sample-list">
+        ''')
+        
+        for i, s in enumerate(samples[:20]):  # Limit to first 20 samples
+            sid = s.get("id", s.get("sid", f"sample-{i}"))
+            prediction = s.get("prediction", "")[:200]  # Truncate
+            reference = s.get("reference", "")[:100]
+            is_correct = s.get("correct", None)
+            
+            status_class = "correct" if is_correct else "incorrect" if is_correct is False else "unknown"
+            status_icon = "✓" if is_correct else "✗" if is_correct is False else "?"
+            
+            out.append(f'''
+                <div class="sample-item {status_class}">
+                    <div class="sample-header">
+                        <span class="status-icon">{status_icon}</span>
+                        <span class="sample-id">{html.escape(str(sid))}</span>
+                    </div>
+                    <div class="sample-content">
+                        <div class="prediction"><strong>Pred:</strong> {html.escape(prediction)}...</div>
+                        <div class="reference"><strong>Ref:</strong> {html.escape(str(reference))}</div>
+                    </div>
+                </div>
+            ''')
+        
+        if len(samples) > 20:
+            out.append(f'<div class="muted">... and {len(samples) - 20} more samples</div>')
+        
+        out.append('</div></details>')
+    
+    return '\n'.join(out)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Generate HTML benchmark report with charts.")
     ap.add_argument("--results-dir", default="results", help="Directory containing run folders")
@@ -978,6 +1047,81 @@ def main() -> int:
         .charts-grid {{ grid-template-columns: 1fr; }}
         .summary-cards {{ grid-template-columns: repeat(2, 1fr); }}
     }}
+    
+    /* Per-Sample Results */
+    .sample-details {{
+        margin: 8px 0;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        background: #fafafa;
+    }}
+    .sample-details summary {{
+        padding: 10px 15px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+    }}
+    .sample-details summary:hover {{
+        background: #f0f0f0;
+    }}
+    .sample-count {{
+        background: #e0e0e0;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+    }}
+    .sample-list {{
+        padding: 10px;
+        max-height: 400px;
+        overflow-y: auto;
+    }}
+    .sample-item {{
+        margin: 5px 0;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        border-left: 3px solid #ccc;
+    }}
+    .sample-item.correct {{
+        background: #e8f5e9;
+        border-left-color: #4caf50;
+    }}
+    .sample-item.incorrect {{
+        background: #ffebee;
+        border-left-color: #f44336;
+    }}
+    .sample-item.unknown {{
+        background: #fff8e1;
+        border-left-color: #ff9800;
+    }}
+    .sample-header {{
+        display: flex;
+        gap: 8px;
+        margin-bottom: 4px;
+    }}
+    .status-icon {{
+        font-weight: bold;
+    }}
+    .sample-id {{
+        color: #666;
+    }}
+    .sample-content {{
+        font-family: monospace;
+        font-size: 10px;
+        color: #444;
+    }}
+    .prediction, .reference {{
+        margin: 2px 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }}
+    .muted {{
+        color: #888;
+        font-size: 12px;
+    }}
   </style>
 </head>
 <body>
@@ -1015,6 +1159,8 @@ def main() -> int:
     {generate_full_table("All Runs", rows_sorted, "all-runs")}
     
     {generate_workload_tables(rows_sorted)}
+    
+    {generate_per_sample_results(results_dir)}
     
   </div>
   

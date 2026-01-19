@@ -189,8 +189,10 @@ def main():
             prediction_text = o.get("text", "")
             reference_text = getattr(s, "reference", "")
             
-            # Store for accuracy calculation
+            # Check accuracy and store for aggregation
+            is_correct = None
             if accuracy_check_fn is not None and reference_text:
+                is_correct = accuracy_check_fn(prediction_text, reference_text)
                 predictions_for_accuracy.append((prediction_text, reference_text))
             
             # Extract TTFT metrics (can be at top level or in extra dict)
@@ -205,6 +207,10 @@ def main():
                 "latency_ms": lat,
                 "extra": json_safe(extra_data),
             }
+            
+            # Add correctness field for per-sample debugging
+            if is_correct is not None:
+                rec["correct"] = is_correct
             
             # Add TTFT metrics at top level if available (easier for aggregate.py/report.py)
             if ttft_ms is not None:
