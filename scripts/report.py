@@ -319,10 +319,12 @@ def generate_grouped_bar_chart_svg(data: Dict[str, Dict[str, float]], title: str
 
 def generate_accuracy_comparison_table(rows: List[Dict[str, Any]]) -> str:
     """Generate accuracy comparison table by workload and backend."""
-    # Group by workload and backend, take latest
+    # Group by base workload and backend, take latest run only
+    # This avoids duplicates like "reasoning" and "reasoning (toy)"
     data: Dict[str, Dict[str, Dict[str, Any]]] = {}  # workload -> backend -> metrics
     
     for r in rows:
+        # Use base workload name (not workload_full) to consolidate
         workload = r.get("workload", "")
         backend = r.get("backend", "")
         if not workload or not backend:
@@ -331,8 +333,9 @@ def generate_accuracy_comparison_table(rows: List[Dict[str, Any]]) -> str:
         if workload not in data:
             data[workload] = {}
         
-        # Keep latest (rows should be sorted by timestamp)
-        data[workload][backend] = r
+        # Keep latest (rows are sorted by timestamp desc, so first one wins)
+        if backend not in data[workload]:
+            data[workload][backend] = r
     
     if not data:
         return ""
@@ -369,16 +372,20 @@ def generate_accuracy_comparison_table(rows: List[Dict[str, Any]]) -> str:
 
 def generate_latency_comparison_table(rows: List[Dict[str, Any]]) -> str:
     """Generate latency comparison table by workload and backend."""
+    # Use workload_full to include dataset source
     data: Dict[str, Dict[str, Dict[str, Any]]] = {}
     
     for r in rows:
+        # Use base workload name to consolidate
         workload = r.get("workload", "")
         backend = r.get("backend", "")
         if not workload or not backend:
             continue
         if workload not in data:
             data[workload] = {}
-        data[workload][backend] = r
+        # Keep latest only
+        if backend not in data[workload]:
+            data[workload][backend] = r
     
     if not data:
         return ""
@@ -400,6 +407,67 @@ def generate_latency_comparison_table(rows: List[Dict[str, Any]]) -> str:
                 lat = safe_float(data[wl][b].get("lat_p50"))
                 if lat is not None:
                     out.append(f'<td>{lat:.0f}ms</td>')
+                else:
+                    out.append('<td>-</td>')
+            else:
+                out.append('<td>-</td>')
+        out.append('</tr>')
+    
+    out.append('</tbody></table>')
+    return '\n'.join(out)
+
+
+def generate_cost_efficiency_table(rows: List[Dict[str, Any]]) -> str:
+    """Generate cost efficiency comparison table (cost per correct answer)."""
+    # Use base workload name to consolidate
+    data: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    
+    for r in rows:
+        workload = r.get("workload", "")
+        backend = r.get("backend", "")
+        if not workload or not backend:
+            continue
+        if workload not in data:
+            data[workload] = {}
+        # Keep latest only
+        if backend not in data[workload]:
+            data[workload][backend] = r
+    
+    if not data:
+        return ""
+    
+    workloads = sorted(data.keys())
+    backends = sorted(set(b for w in data.values() for b in w.keys()))
+    
+    out = ['<h2>Cost Efficiency ($ per correct answer)</h2>']
+    out.append('<p><small>Lower is better. Shows cost divided by number of correct answers. Only for OpenAI (local backends have no API cost).</small></p>')
+    out.append('<table class="comparison-table">')
+    out.append('<thead><tr><th>Workload</th>')
+    for b in backends:
+        out.append(f'<th>{html.escape(b)}</th>')
+    out.append('</tr></thead><tbody>')
+    
+    for wl in workloads:
+        out.append(f'<tr><td><strong>{html.escape(wl)}</strong></td>')
+        for b in backends:
+            if b in data[wl]:
+                r = data[wl][b]
+                cost = safe_float(r.get("cost"))
+                acc_mean = r.get("accuracy_mean")
+                n = safe_float(r.get("n")) or 10
+                
+                if cost and cost > 0 and acc_mean is not None and acc_mean > 0:
+                    correct_count = int(n * acc_mean)
+                    cost_per_correct = cost / correct_count if correct_count > 0 else None
+                    if cost_per_correct is not None:
+                        # Color based on cost (green = cheap, red = expensive)
+                        color = "#2ecc71" if cost_per_correct < 0.001 else "#f39c12" if cost_per_correct < 0.01 else "#e74c3c"
+                        out.append(f'<td style="background: {color}22; color: {color}; font-weight: bold;">${cost_per_correct:.4f}</td>')
+                    else:
+                        out.append('<td>-</td>')
+                elif b != "openai":
+                    # Local backends have no cost
+                    out.append('<td style="color: #2ecc71;">$0 (local)</td>')
                 else:
                     out.append('<td>-</td>')
             else:
@@ -661,12 +729,30 @@ def main() -> int:
             # Cost per 1M tokens
             cost_per_1m = (cost / total * 1_000_000) if cost and total else None
 
+            # Extract workload with dataset source from run_dir name
+            # e.g., "openai_reasoning_toy" -> "reasoning", dataset_source = "toy"
+            # e.g., "openai_math_gsm8k" -> "math", dataset_source = "gsm8k"
+            workload_base = cfg.get("workload", "")
+            run_name = run_dir.name
+            
+            # Try to extract dataset source from run_dir name
+            dataset_source = ""
+            known_sources = ["toy", "gsm8k", "boolq", "xsum", "cnn", "logiqa", "ner"]
+            for src in known_sources:
+                if f"_{src}" in run_name.lower():
+                    dataset_source = src
+                    break
+            
+            # Create descriptive workload name for comparison tables
+            workload_with_source = f"{workload_base} ({dataset_source})" if dataset_source else workload_base
+            
             rows.append({
                 "run_dir": run_dir.name,
                 "ts": ts,
                 "backend": cfg.get("backend", ""),
                 "backend_model": cfg.get("backend_model", ""),
-                "workload": cfg.get("workload", ""),
+                "workload": workload_base,  # Keep base for grouping
+                "workload_full": workload_with_source,  # Full name with dataset source
                 "n": metrics.get("n", ""),
                 "lat_mean": metrics.get("latency_ms_mean"),
                 "lat_p50": metrics.get("latency_ms_p50"),
@@ -919,6 +1005,8 @@ def main() -> int:
     {generate_accuracy_comparison_table(rows_sorted)}
     
     {generate_latency_comparison_table(rows_sorted)}
+    
+    {generate_cost_efficiency_table(rows_sorted)}
     
     {generate_charts_section(rows_sorted)}
     
