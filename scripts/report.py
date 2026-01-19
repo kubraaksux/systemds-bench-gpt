@@ -535,7 +535,7 @@ def fmt_cost_per_1m_if_real(r: Dict[str, Any]) -> str:
         return fmt_cost(cost)
     return "-"
 
-# Define ALL columns for the full table (removed TTFT/Gen mean - not tracked yet)
+# Define ALL columns for the full table (includes TTFT for streaming backends)
 FULL_TABLE_COLUMNS = [
     ("run_dir", "Run", lambda r: f'<code>{html.escape(str(r.get("run_dir", ""))[:25])}</code>'),
     ("ts", "Timestamp (UTC)", lambda r: html.escape((r.get("ts", "") or "")[:19].replace("T", " "))),
@@ -555,6 +555,8 @@ FULL_TABLE_COLUMNS = [
     ("lat_cv", "Lat CV (%)", lambda r: fmt_pct(r.get("lat_cv"))),
     ("lat_min", "Lat Min (ms)", lambda r: fmt_num(r.get("lat_min"), 2)),
     ("lat_max", "Lat Max (ms)", lambda r: fmt_num(r.get("lat_max"), 2)),
+    ("ttft_mean", "TTFT (ms)", lambda r: fmt_num(r.get("ttft_mean"), 2)),
+    ("gen_mean", "Gen (ms)", lambda r: fmt_num(r.get("gen_mean"), 2)),
     ("thr", "throughput (req/s)", lambda r: fmt_num(r.get("thr"), 4)),
     ("total_tokens", "total tok", lambda r: fmt(r.get("total_tokens"))),
     ("avg_tokens", "avg tok", lambda r: fmt_num(r.get("avg_tokens"), 1)),
