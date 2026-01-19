@@ -32,7 +32,7 @@ class ResourceMonitor:
         self.running = True
         self.memory_samples = []
         self.cpu_samples = []
-        self.initial_memory = self.process.memory_info().rss / 1024 / 1024  # MB
+        self.initial_memory = self.process.memory_info().rss / 1024 / 1024  # mB
         
         def monitor():
             while self.running:
@@ -122,7 +122,7 @@ def main():
 
     cfg: Dict[str, Any] = yaml.safe_load(Path(args.workload).read_text(encoding="utf-8"))
     
-    # Dynamically load the workload module based on config name
+    # dynamically load the workload module based on config name
     workload_name = cfg.get("name", "summarization")
     try:
         loader_module = importlib.import_module(f"workloads.{workload_name}.loader")
@@ -164,7 +164,7 @@ def main():
     samples = load_samples(cfg)
     prompts = [make_prompt(s, cfg) for s in samples]
 
-    # Start resource monitoring
+    # start resource monitoring
     monitor = ResourceMonitor()
     monitor.start()
 
@@ -172,14 +172,14 @@ def main():
     outputs = backend.generate(prompts, backend_cfg)
     t1 = time.perf_counter()
 
-    # Stop monitoring and get resource stats
+    # stop monitoring and get resource stats
     resource_stats = monitor.stop()
 
-    # Check if workload has accuracy_check function
+    # check if workload has accuracy_check function
     accuracy_check_fn = getattr(loader_module, "accuracy_check", None)
     
     latencies = []
-    predictions_for_accuracy = []  # Store (prediction, reference) pairs for accuracy calc
+    predictions_for_accuracy = []  # store (prediction, reference) pairs for accuracy calc
     
     with (out_dir / "samples.jsonl").open("w", encoding="utf-8") as f:
         for s, o in zip(samples, outputs):
@@ -189,13 +189,13 @@ def main():
             prediction_text = o.get("text", "")
             reference_text = getattr(s, "reference", "")
             
-            # Check accuracy and store for aggregation
+            # check accuracy and store for aggregation
             is_correct = None
             if accuracy_check_fn is not None and reference_text:
                 is_correct = accuracy_check_fn(prediction_text, reference_text)
                 predictions_for_accuracy.append((prediction_text, reference_text))
             
-            # Extract TTFT metrics (can be at top level or in extra dict)
+            # extract TTFT metrics (can be at top level or in extra dict)
             extra_data = o.get("extra", {})
             ttft_ms = o.get("ttft_ms") or extra_data.get("ttft_ms")
             generation_ms = o.get("generation_ms") or extra_data.get("generation_ms")
@@ -208,11 +208,11 @@ def main():
                 "extra": json_safe(extra_data),
             }
             
-            # Add correctness field for per-sample debugging
+            # add correctness field for per-sample debugging
             if is_correct is not None:
                 rec["correct"] = is_correct
             
-            # Add TTFT metrics at top level if available (easier for aggregate.py/report.py)
+            # add TTFT metrics at top level if available (easier for aggregate.py/report.py)
             if ttft_ms is not None:
                 rec["ttft_ms"] = float(ttft_ms)
             if generation_ms is not None:
@@ -222,14 +222,14 @@ def main():
 
     metrics = perf_metrics(latencies, total_wall_s=(t1 - t0))
     
-    # Calculate accuracy if accuracy_check function is available
+    # calculate accuracy if accuracy_check function is available
     if accuracy_check_fn is not None and predictions_for_accuracy:
         correct = sum(1 for pred, ref in predictions_for_accuracy if accuracy_check_fn(pred, ref))
         total = len(predictions_for_accuracy)
         metrics["accuracy_mean"] = correct / total if total > 0 else 0.0
         metrics["accuracy_count"] = f"{correct}/{total}"
     
-    # Aggregate cost from all outputs
+    # aggregate cost from all outputs
     total_cost = sum(o.get("extra", {}).get("cost_usd", 0.0) for o in outputs)
     total_tokens = sum(o.get("extra", {}).get("usage", {}).get("total_tokens", 0) for o in outputs)
     
@@ -237,12 +237,12 @@ def main():
         metrics["cost_total_usd"] = total_cost
         metrics["cost_per_1m_tokens"] = (total_cost / total_tokens * 1_000_000) if total_tokens > 0 else 0.0
     
-    # Add resource usage stats
+    # add resource usage stats
     metrics.update(resource_stats)
     
     write_json(out_dir / "metrics.json", metrics)
     
-    # Add run_config.json for reporting
+    # add run_config.json for reporting
     run_config = {
         "backend": args.backend,
         "backend_model": backend_model,
