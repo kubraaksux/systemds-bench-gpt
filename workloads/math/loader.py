@@ -110,11 +110,14 @@ def extract_number_from_response(text: str) -> Optional[str]:
     """
     Extract the final numerical answer from model response.
     
+    IMPORTANT: Some models (like phi-2) generate follow-up exercises after the 
+    main answer. We need to find the FIRST complete answer, not the last number.
+    
     Strategies (in order of priority):
-    1. Look for explicit answer patterns ("the answer is X", "#### X")
+    1. Look for explicit answer patterns ("the answer is X", "#### X") - take FIRST match
     2. Look for bolded/boxed answers (**X**, \\boxed{X})
-    3. Look for "= X" patterns in final lines
-    4. Take the last standalone number in the response
+    3. Look for "= X" patterns (calculation results)
+    4. Take the last standalone number in the response (fallback only)
     """
     if not text:
         return None
@@ -129,18 +132,35 @@ def extract_number_from_response(text: str) -> Optional[str]:
             s = s[:-1]
         return s
     
+    # Check if text contains follow-up exercises (phi-2 pattern)
+    # If so, only look at text before "Follow-up" or similar markers
+    main_answer_text = text
+    follow_up_markers = [
+        r'\bFollow-up\b', r'\bBonus\b', r'\bExtra\b', r'\bNext\b.*\bproblem\b',
+        r'\bNow\s+try\b', r'\bPractice\b', r'\bExercise\b',
+        r'\bQuestion\s*\d+[:\s]',  # "Question 2:" - phi-2 generates extra questions
+    ]
+    for marker in follow_up_markers:
+        match = re.search(marker, text, re.IGNORECASE)
+        if match:
+            main_answer_text = text[:match.start()]
+            break
+    
     # Strategy 1: Look for explicit "answer is" patterns (highest priority)
+    # Take the FIRST match in the main answer section (not follow-ups)
     answer_patterns = [
         r'####\s*\$?([0-9,]+(?:\.[0-9]+)?)',  # GSM8K format: #### 42
-        r'(?:the\s+)?(?:final\s+)?answer\s+(?:is|=)[:\s]*\$?([0-9,]+(?:\.[0-9]+)?)',
-        r'(?:final\s+)?answer[:\s]+\$?([0-9,]+(?:\.[0-9]+)?)',
+        r'(?:the\s+)?(?:final\s+)?answer\s*(?:is|=|:)[:\s]*\$?([0-9,]+(?:\.[0-9]+)?)',
+        r'[Aa]nswer[:\s]+[A-Za-z\s]*\$?([0-9,]+(?:\.[0-9]+)?)',  # "Answer: Janet makes $18"
+        r'takes?\s+(\d+)\s+(?:bolts?|cups?|items?|pieces?)\s+(?:in\s+total|total)',  # "takes 3 bolts in total"
+        r'(\d+)\s+(?:bolts?|cups?|items?|pieces?)\s+in\s+total',  # "3 bolts in total"
     ]
     
     for pattern in answer_patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
+        matches = re.findall(pattern, main_answer_text, re.IGNORECASE)
         if matches:
-            # Take the last match (final answer)
-            return clean_num(matches[-1])
+            # Take the FIRST match (main answer, not follow-up)
+            return clean_num(matches[0])
     
     # Strategy 2: Look for bolded/boxed answers (common LLM format)
     bold_patterns = [
@@ -149,27 +169,46 @@ def extract_number_from_response(text: str) -> Optional[str]:
     ]
     
     for pattern in bold_patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
+        matches = re.findall(pattern, main_answer_text, re.IGNORECASE)
         if matches:
-            # Take the last bolded number
-            return clean_num(matches[-1])
+            # Take the first bolded number
+            return clean_num(matches[0])
     
-    # Strategy 3: Look for "= X" at end of lines (calculation results)
-    # Check last few lines for "= number" patterns
-    lines = text.split('\n')
-    for line in reversed(lines[-10:]):  # Check last 10 lines
-        match = re.search(r'=\s*\$?([0-9,]+(?:\.[0-9]+)?)\s*$', line.strip())
+    # Strategy 3: Look for "= X" at end of lines - check LAST lines first (final answer)
+    lines = main_answer_text.split('\n')
+    # Check last 5 lines first for "= $X" pattern
+    for line in reversed(lines[-5:]):
+        # Look for "= $X" or "= X" patterns that end sentences  
+        match = re.search(r'=\s*\$?([0-9,]+(?:\.[0-9]+)?)\s*(?:/day|/week|per\s+\w+)?\s*[.!?]?\s*$', line.strip())
         if match:
             return clean_num(match.group(1))
     
-    # Strategy 4: Look for the last number followed by period/end (sentence-ending number)
-    # This catches "...makes $18." or "...total of 260."
-    matches = re.findall(r'\$?([0-9,]+(?:\.[0-9]+)?)\s*[.!?]?\s*$', text, re.MULTILINE)
+    # Strategy 4: Look for specific final answer patterns
+    # "So, Josh made a profit of $70,000" or "earnings for this week are $460"
+    final_patterns = [
+        r'(?:profit|earnings|total|made|earned|is|are)\s+(?:of\s+)?\$([0-9,]+(?:\.[0-9]+)?)',  # profit of $70,000
+        r'\$([0-9,]+(?:\.[0-9]+)?)\s*[.!]?\s*$',  # ends with $X
+    ]
+    
+    # Look in the last few lines first (where final answer usually is)
+    last_lines = '\n'.join(main_answer_text.strip().split('\n')[-5:])
+    for pattern in final_patterns:
+        matches = re.findall(pattern, last_lines, re.IGNORECASE)
+        if matches:
+            return clean_num(matches[-1])
+    
+    # Strategy 5: Look for currency amounts in the full answer
+    currency_matches = re.findall(r'\$([0-9,]+(?:\.[0-9]+)?)', main_answer_text)
+    if currency_matches:
+        return clean_num(currency_matches[-1])
+    
+    # Strategy 5: Look for the last number followed by period/end (sentence-ending number)
+    matches = re.findall(r'\b([0-9,]+(?:\.[0-9]+)?)\s*[.!?]?\s*$', main_answer_text, re.MULTILINE)
     if matches:
         return clean_num(matches[-1])
     
-    # Final fallback: any number (take the last one)
-    numbers = re.findall(r'\b([0-9,]+(?:\.[0-9]+)?)\b', text)
+    # Final fallback: any number (take the last one from main text)
+    numbers = re.findall(r'\b([0-9,]+(?:\.[0-9]+)?)\b', main_answer_text)
     if numbers:
         return clean_num(numbers[-1])
     
