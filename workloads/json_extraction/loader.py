@@ -450,17 +450,21 @@ def accuracy_check(prediction: str, reference: str) -> bool:
     """
     Check if the prediction contains valid JSON with correct field values.
     
-    Accuracy criteria (hybrid approach - best practice):
+    Accuracy criteria (STRICT - to differentiate model quality):
     1. Must produce valid JSON
     2. Must have all required fields
-    3. At least 70% of field values must match (with tolerance)
+    3. At least 90% of field values must match EXACTLY (stricter threshold)
+    
+    Note: The toy dataset is relatively easy (explicit facts in text).
+    Use stricter matching to better differentiate model quality.
+    For harder evaluation, use source: "ner" or "json_struct" in config.yaml.
     
     Args:
         prediction: The model's full response text
         reference: The expected JSON string
     
     Returns:
-        True if valid JSON with >= 70% correct field values, False otherwise
+        True if valid JSON with >= 90% correct field values, False otherwise
     """
     # Parse the reference to get expected fields
     try:
@@ -482,14 +486,55 @@ def accuracy_check(prediction: str, reference: str) -> bool:
     if not required_fields.issubset(present_fields):
         return False
     
-    # Count matching values
+    # Count matching values - use STRICT matching
     matches = 0
     total = len(ref_dict)
     
     for field, ref_val in ref_dict.items():
         pred_val = pred_dict.get(field)
-        if _values_match(pred_val, ref_val):
+        if _values_match_strict(pred_val, ref_val):
             matches += 1
     
-    # Require at least 70% of values to match
-    return (matches / total) >= 0.70
+    # Require at least 90% of values to match exactly
+    return (matches / total) >= 0.90
+
+
+def _values_match_strict(pred_val, ref_val) -> bool:
+    """
+    STRICT value matching - less forgiving than _values_match.
+    
+    This helps differentiate model quality on the toy dataset.
+    """
+    # Normalize both values
+    pred_norm = _normalize_value(pred_val)
+    ref_norm = _normalize_value(ref_val)
+    
+    # Exact match after normalization
+    if pred_norm == ref_norm:
+        return True
+    
+    # For strings, require exact match or exact substring (no partial)
+    if isinstance(ref_val, str) and isinstance(pred_val, str):
+        ref_lower = ref_val.lower().strip()
+        pred_lower = pred_val.lower().strip()
+        # Only allow if prediction exactly equals reference (case-insensitive)
+        # or if one is a title variant (Dr., Mr., etc.)
+        if ref_lower == pred_lower:
+            return True
+        # Allow "Dr. Maria Garcia" to match "Maria Garcia" but not vice versa
+        if pred_lower.replace("dr. ", "").replace("mr. ", "").replace("ms. ", "") == ref_lower:
+            return True
+        if ref_lower.replace("dr. ", "").replace("mr. ", "").replace("ms. ", "") == pred_lower:
+            return True
+        return False
+    
+    # For numbers, require exact match (no tolerance)
+    if isinstance(ref_val, (int, float)) and isinstance(pred_val, (int, float)):
+        # Allow int/float type differences (35 == 35.0)
+        return float(pred_val) == float(ref_val)
+    
+    # For booleans
+    if isinstance(ref_val, bool) and isinstance(pred_val, bool):
+        return ref_val == pred_val
+    
+    return False
