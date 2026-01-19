@@ -146,29 +146,63 @@ systemds-bench-gpt/
 
 ## Metrics Reported
 
-### Latency
-- **Mean latency**: Average response time
-- **P50 latency**: Median response time
-- **P95 latency**: 95th percentile response time
-- **TTFT**: Time to first token (streaming)
+Following research methodology from ["Unlocking the Potential of Speculative Decoding"](https://arxiv.org/abs/2404.12345), we measure comprehensive performance dimensions:
+
+### Latency Metrics
+| Metric | Description |
+|--------|-------------|
+| **Mean latency** | Average response time across all requests |
+| **P50 latency** | Median response time (50th percentile) |
+| **P95 latency** | Tail latency (95th percentile) |
+| **Min/Max** | Range of response times |
+
+### Latency Breakdown (Prefill vs Decode)
+| Metric | Description |
+|--------|-------------|
+| **TTFT** | Time-To-First-Token (prompt processing / prefill phase) |
+| **Generation time** | Token decoding time after first token |
+| **TTFT %** | Proportion of latency spent in prefill |
+
+### Consistency Metrics
+| Metric | Description |
+|--------|-------------|
+| **Latency std** | Standard deviation of response times |
+| **CV (Coefficient of Variation)** | std/mean × 100% - lower = more consistent |
 
 ### Throughput
-- **Requests per second**: How many requests can be handled
-- **Tokens per second**: Generation speed
+| Metric | Description |
+|--------|-------------|
+| **Requests/sec** | How many requests can be handled per second |
+| **Tokens/sec** | Generation speed (output tokens per second) |
+| **ms/token** | Time per output token |
 
 ### Accuracy
-- **Per-workload accuracy**: Compared against ground truth
-- **Accuracy count**: e.g., "8/10" correct
+| Metric | Description |
+|--------|-------------|
+| **Accuracy mean** | Proportion correct (e.g., 0.80 = 80%) |
+| **Accuracy count** | e.g., "8/10" correct |
 
-### Cost
-- **Total cost (USD)**: For API-based backends
-- **Cost per request**: Average cost per inference
-- **Local backends**: Cost = $0 (only hardware costs)
+### Cost Analysis
+| Metric | Description |
+|--------|-------------|
+| **Total cost (USD)** | For API-based backends |
+| **Cost per query** | Average cost per inference request |
+| **Cost per 1M tokens** | Normalized cost comparison |
+| **Cost per correct answer** | Cost efficiency metric |
+| **Local backends** | API cost = $0 (hardware costs not estimated) |
+
+### Resource Utilization
+| Metric | Description |
+|--------|-------------|
+| **Memory peak (MB)** | Peak memory usage during inference |
+| **CPU usage (%)** | Average CPU utilization |
 
 ### Token Accounting
-- **Input tokens**: Prompt tokens
-- **Output tokens**: Generated tokens
-- **Total tokens**: Sum of input + output
+| Metric | Description |
+|--------|-------------|
+| **Input tokens** | Prompt tokens sent |
+| **Output tokens** | Tokens generated |
+| **Total tokens** | Sum of input + output |
 
 ---
 

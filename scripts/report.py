@@ -417,6 +417,123 @@ def generate_latency_comparison_table(rows: List[Dict[str, Any]]) -> str:
     return '\n'.join(out)
 
 
+def generate_latency_breakdown_table(rows: List[Dict[str, Any]]) -> str:
+    """Generate latency breakdown table showing TTFT vs Generation time (like prefill vs decode)."""
+    # Only include rows with TTFT data
+    data: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    
+    for r in rows:
+        workload = r.get("workload", "")
+        backend = r.get("backend", "")
+        ttft = r.get("ttft_mean")
+        gen = r.get("gen_mean")
+        
+        if not workload or not backend:
+            continue
+        if ttft is None and gen is None:
+            continue
+            
+        if workload not in data:
+            data[workload] = {}
+        if backend not in data[workload]:
+            data[workload][backend] = r
+    
+    if not data:
+        return '<p class="muted">No TTFT data available. Enable streaming mode for OpenAI to measure TTFT.</p>'
+    
+    workloads = sorted(data.keys())
+    backends = sorted(set(b for w in data.values() for b in w.keys()))
+    
+    out = ['<h2>⏱️ Latency Breakdown (TTFT vs Generation)</h2>']
+    out.append('<p><small>Time-To-First-Token (TTFT) = prefill/prompt processing. Generation = token decoding. Only available for streaming backends.</small></p>')
+    out.append('<table class="comparison-table">')
+    out.append('<thead><tr><th>Workload</th><th>Backend</th><th>TTFT (ms)</th><th>Generation (ms)</th><th>Total (ms)</th><th>TTFT %</th></tr></thead><tbody>')
+    
+    for wl in workloads:
+        for b in backends:
+            if b in data[wl]:
+                r = data[wl][b]
+                ttft = safe_float(r.get("ttft_mean"))
+                gen = safe_float(r.get("gen_mean"))
+                total = safe_float(r.get("lat_mean"))
+                
+                ttft_str = f'{ttft:.0f}' if ttft else '-'
+                gen_str = f'{gen:.0f}' if gen else '-'
+                total_str = f'{total:.0f}' if total else '-'
+                
+                if ttft and gen:
+                    ttft_pct = (ttft / (ttft + gen)) * 100
+                    pct_str = f'{ttft_pct:.0f}%'
+                    # Color based on TTFT proportion
+                    color = '#2ecc71' if ttft_pct < 30 else '#f39c12' if ttft_pct < 60 else '#e74c3c'
+                else:
+                    pct_str = '-'
+                    color = '#666'
+                
+                out.append(f'<tr><td>{html.escape(wl)}</td><td>{html.escape(b)}</td>')
+                out.append(f'<td>{ttft_str}</td><td>{gen_str}</td><td>{total_str}</td>')
+                out.append(f'<td style="color: {color}; font-weight: bold;">{pct_str}</td></tr>')
+    
+    out.append('</tbody></table>')
+    return '\n'.join(out)
+
+
+def generate_consistency_metrics_table(rows: List[Dict[str, Any]]) -> str:
+    """Generate consistency metrics table showing latency variance across backends."""
+    data: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    
+    for r in rows:
+        workload = r.get("workload", "")
+        backend = r.get("backend", "")
+        if not workload or not backend:
+            continue
+        if workload not in data:
+            data[workload] = {}
+        if backend not in data[workload]:
+            data[workload][backend] = r
+    
+    if not data:
+        return ""
+    
+    workloads = sorted(data.keys())
+    backends = sorted(set(b for w in data.values() for b in w.keys()))
+    
+    out = ['<h2>📊 Consistency Metrics (Latency Variance)</h2>']
+    out.append('<p><small>CV (Coefficient of Variation) = std/mean × 100%. Lower CV = more consistent performance.</small></p>')
+    out.append('<table class="comparison-table">')
+    out.append('<thead><tr><th>Workload</th><th>Backend</th><th>Mean (ms)</th><th>Std (ms)</th><th>Min (ms)</th><th>Max (ms)</th><th>CV (%)</th></tr></thead><tbody>')
+    
+    for wl in workloads:
+        for b in backends:
+            if b in data[wl]:
+                r = data[wl][b]
+                mean = safe_float(r.get("lat_mean"))
+                std = safe_float(r.get("lat_std"))
+                lat_min = safe_float(r.get("lat_min"))
+                lat_max = safe_float(r.get("lat_max"))
+                cv = safe_float(r.get("lat_cv"))
+                
+                mean_str = f'{mean:.0f}' if mean else '-'
+                std_str = f'{std:.0f}' if std else '-'
+                min_str = f'{lat_min:.0f}' if lat_min else '-'
+                max_str = f'{lat_max:.0f}' if lat_max else '-'
+                
+                if cv is not None:
+                    cv_str = f'{cv:.1f}%'
+                    # Color based on consistency (lower is better)
+                    color = '#2ecc71' if cv < 20 else '#f39c12' if cv < 50 else '#e74c3c'
+                else:
+                    cv_str = '-'
+                    color = '#666'
+                
+                out.append(f'<tr><td>{html.escape(wl)}</td><td>{html.escape(b)}</td>')
+                out.append(f'<td>{mean_str}</td><td>{std_str}</td><td>{min_str}</td><td>{max_str}</td>')
+                out.append(f'<td style="color: {color}; font-weight: bold;">{cv_str}</td></tr>')
+    
+    out.append('</tbody></table>')
+    return '\n'.join(out)
+
+
 def generate_cost_efficiency_table(rows: List[Dict[str, Any]]) -> str:
     """Generate cost efficiency comparison table (cost per correct answer)."""
     # Use base workload name to consolidate
@@ -500,6 +617,7 @@ def generate_cost_analysis_section(rows: List[Dict[str, Any]]) -> str:
                 "accuracy": acc,
                 "n": n,
                 "latency": lat,
+                "total_tokens": r.get("total_tokens"),
             })
         elif backend in ["ollama", "mlx", "vllm"]:
             local_runs.append({
@@ -529,10 +647,16 @@ def generate_cost_analysis_section(rows: List[Dict[str, Any]]) -> str:
         <h3>☁️ Cloud (OpenAI API)</h3>
         <div class="cost-stats">
     ''')
+    # Calculate cost per 1M tokens
+    total_tokens = sum(safe_float(c.get("total_tokens", 0)) or 0 for c in openai_costs)
+    cost_per_1m_tokens = (total_openai_cost / total_tokens * 1_000_000) if total_tokens > 0 else None
+    
     out.append(f'<div class="stat"><span class="label">Total Spent:</span> <span class="value">${total_openai_cost:.4f}</span></div>')
     out.append(f'<div class="stat"><span class="label">Runs with Cost:</span> <span class="value">{len(openai_costs)}</span></div>')
     out.append(f'<div class="stat"><span class="label">Avg Cost/Run:</span> <span class="value">${avg_cost_per_run:.4f}</span></div>')
     out.append(f'<div class="stat"><span class="label">Cost/Query:</span> <span class="value">${cost_per_query:.6f}</span></div>')
+    if cost_per_1m_tokens:
+        out.append(f'<div class="stat"><span class="label">Cost/1M Tokens:</span> <span class="value">${cost_per_1m_tokens:.2f}</span></div>')
     out.append('''
         </div>
         <div class="pros-cons">
@@ -1540,6 +1664,10 @@ def main() -> int:
     {generate_accuracy_comparison_table(rows_sorted)}
     
     {generate_latency_comparison_table(rows_sorted)}
+    
+    {generate_latency_breakdown_table(rows_sorted)}
+    
+    {generate_consistency_metrics_table(rows_sorted)}
     
     {generate_cost_efficiency_table(rows_sorted)}
     
