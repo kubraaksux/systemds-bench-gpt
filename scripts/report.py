@@ -478,6 +478,116 @@ def generate_cost_efficiency_table(rows: List[Dict[str, Any]]) -> str:
     return '\n'.join(out)
 
 
+def generate_cost_analysis_section(rows: List[Dict[str, Any]]) -> str:
+    """Generate comprehensive cost analysis comparing cloud vs local inference."""
+    
+    # Collect OpenAI costs
+    openai_costs = []
+    local_runs = []
+    
+    for r in rows:
+        backend = r.get("backend", "")
+        cost = safe_float(r.get("cost"))
+        workload = r.get("workload", "")
+        acc = r.get("accuracy_mean")
+        n = safe_float(r.get("n")) or 10
+        lat = safe_float(r.get("lat_p50"))
+        
+        if backend == "openai" and cost and cost > 0:
+            openai_costs.append({
+                "workload": workload,
+                "cost": cost,
+                "accuracy": acc,
+                "n": n,
+                "latency": lat,
+            })
+        elif backend in ["ollama", "mlx", "vllm"]:
+            local_runs.append({
+                "backend": backend,
+                "workload": workload,
+                "accuracy": acc,
+                "n": n,
+                "latency": lat,
+            })
+    
+    if not openai_costs:
+        return ""
+    
+    out = ['<h2>💰 Cost Analysis: Cloud vs Local Inference</h2>']
+    
+    # Summary stats
+    total_openai_cost = sum(c["cost"] for c in openai_costs)
+    avg_cost_per_run = total_openai_cost / len(openai_costs) if openai_costs else 0
+    total_queries = sum(c["n"] for c in openai_costs)
+    cost_per_query = total_openai_cost / total_queries if total_queries > 0 else 0
+    
+    out.append('<div class="cost-analysis-grid">')
+    
+    # Cloud costs card
+    out.append('''
+    <div class="cost-card cloud">
+        <h3>☁️ Cloud (OpenAI API)</h3>
+        <div class="cost-stats">
+    ''')
+    out.append(f'<div class="stat"><span class="label">Total Spent:</span> <span class="value">${total_openai_cost:.4f}</span></div>')
+    out.append(f'<div class="stat"><span class="label">Runs with Cost:</span> <span class="value">{len(openai_costs)}</span></div>')
+    out.append(f'<div class="stat"><span class="label">Avg Cost/Run:</span> <span class="value">${avg_cost_per_run:.4f}</span></div>')
+    out.append(f'<div class="stat"><span class="label">Cost/Query:</span> <span class="value">${cost_per_query:.6f}</span></div>')
+    out.append('''
+        </div>
+        <div class="pros-cons">
+            <div class="pros">✅ Highest accuracy</div>
+            <div class="pros">✅ No hardware needed</div>
+            <div class="cons">❌ Per-query costs</div>
+            <div class="cons">❌ Network latency</div>
+        </div>
+    </div>
+    ''')
+    
+    # Local costs card
+    out.append('''
+    <div class="cost-card local">
+        <h3>🖥️ Local Inference</h3>
+        <div class="cost-stats">
+    ''')
+    out.append(f'<div class="stat"><span class="label">API Cost:</span> <span class="value highlight">$0</span></div>')
+    out.append(f'<div class="stat"><span class="label">Local Runs:</span> <span class="value">{len(local_runs)}</span></div>')
+    out.append(f'<div class="stat"><span class="label">Backends:</span> <span class="value">{len(set(r["backend"] for r in local_runs))}</span></div>')
+    out.append('''
+        </div>
+        <div class="pros-cons">
+            <div class="pros">✅ Zero API cost</div>
+            <div class="pros">✅ Privacy (data stays local)</div>
+            <div class="cons">❌ Hardware required</div>
+            <div class="cons">❌ Lower accuracy on complex tasks</div>
+        </div>
+    </div>
+    ''')
+    
+    out.append('</div>')  # End cost-analysis-grid
+    
+    # Cost projection table
+    out.append('<h3>📊 Cost Projection (1000 queries)</h3>')
+    out.append('<table class="comparison-table">')
+    out.append('<thead><tr><th>Backend</th><th>Est. Cost (1000 queries)</th><th>Notes</th></tr></thead>')
+    out.append('<tbody>')
+    
+    # Project OpenAI cost
+    projected_1k = cost_per_query * 1000
+    out.append(f'<tr><td>OpenAI (gpt-4.1-mini)</td><td style="color: #e74c3c; font-weight: bold;">${projected_1k:.2f}</td><td>Based on current usage</td></tr>')
+    
+    # Local backends
+    out.append('<tr><td>Ollama (local)</td><td style="color: #2ecc71; font-weight: bold;">$0</td><td>Requires Mac/Linux, ~4GB RAM</td></tr>')
+    out.append('<tr><td>MLX (Apple Silicon)</td><td style="color: #2ecc71; font-weight: bold;">$0</td><td>Requires M1/M2/M3 Mac</td></tr>')
+    out.append('<tr><td>vLLM (GPU server)</td><td style="color: #f39c12; font-weight: bold;">~$5-20</td><td>Cloud GPU: ~$0.20-0.50/hour</td></tr>')
+    
+    out.append('</tbody></table>')
+    
+    out.append('<p class="muted"><small>Note: Local backend costs exclude hardware purchase/depreciation and electricity. vLLM cost estimate based on cloud GPU rental.</small></p>')
+    
+    return '\n'.join(out)
+
+
 def generate_scatter_plot_svg(data: List[Tuple[float, float, str, str]], 
                                title: str, x_label: str, y_label: str,
                                width: int = 400, height: int = 300) -> str:
@@ -1155,6 +1265,59 @@ def main() -> int:
         text-align: left;
     }}
     
+    /* Cost Analysis Section */
+    .cost-analysis-grid {{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-bottom: 24px;
+    }}
+    .cost-card {{
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }}
+    .cost-card.cloud {{
+        border-left: 4px solid #3498db;
+    }}
+    .cost-card.local {{
+        border-left: 4px solid #2ecc71;
+    }}
+    .cost-card h3 {{
+        margin: 0 0 16px 0;
+        font-size: 16px;
+    }}
+    .cost-stats {{
+        margin-bottom: 16px;
+    }}
+    .cost-stats .stat {{
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }}
+    .cost-stats .label {{
+        color: #666;
+    }}
+    .cost-stats .value {{
+        font-weight: 600;
+        color: #1a1a2e;
+    }}
+    .cost-stats .value.highlight {{
+        color: #2ecc71;
+        font-size: 18px;
+    }}
+    .pros-cons {{
+        font-size: 12px;
+    }}
+    .pros {{ color: #2ecc71; margin: 4px 0; }}
+    .cons {{ color: #e74c3c; margin: 4px 0; }}
+    
+    @media (max-width: 768px) {{
+        .cost-analysis-grid {{ grid-template-columns: 1fr; }}
+    }}
+    
     /* Full table with all columns - compact */
     .table-wrapper {{
         overflow-x: auto;
@@ -1379,6 +1542,8 @@ def main() -> int:
     {generate_latency_comparison_table(rows_sorted)}
     
     {generate_cost_efficiency_table(rows_sorted)}
+    
+    {generate_cost_analysis_section(rows_sorted)}
     
     {generate_charts_section(rows_sorted)}
     

@@ -403,11 +403,14 @@ This design ensures the benchmark is ready for SystemDS evaluation while providi
 | **Embeddings Workload** | Add similarity/clustering tasks using embedding APIs | High |
 | **Concurrent Testing** | Test throughput under load with multiple simultaneous requests | High |
 | **SystemDS Backend** | Integrate when SystemDS LLM inference is available | High |
+| **Hardware Cost Analysis** | Estimate $/query for local backends based on hardware costs | High |
 | **Larger Sample Sizes** | Run benchmarks with n=100+ for statistical significance | Medium |
 | **More Backends** | Hugging Face TGI, llama.cpp, Anthropic Claude | Medium |
 | **Code Generation** | Add programming task benchmark (HumanEval, MBPP) | Medium |
-| **Batch Processing** | Compare batch vs. single request performance | Low |
+| **Model Quantization** | Compare 4-bit vs 8-bit vs full precision performance/accuracy | Medium |
+| **Batch Processing** | Compare batch vs. single request performance | Medium |
 | **GPU Profiling** | Detailed GPU memory and utilization tracking | Low |
+| **Prompt Optimization** | Test different prompt strategies for each workload | Low |
 
 ### Known Limitations
 
@@ -418,6 +421,8 @@ This design ensures the benchmark is ready for SystemDS evaluation while providi
 3. **Limited Model Variety**: Each backend tested with one model. More comprehensive would test multiple model sizes.
 
 4. **No Quantization Comparison**: Could compare 4-bit vs 8-bit vs full precision models.
+
+5. **No Hardware Cost Estimation**: Local backends show $0 cost, but real hardware has costs (electricity, depreciation). Future work could estimate $/query based on hardware specs.
 
 ---
 
@@ -430,6 +435,6 @@ License information will be added as the project matures.
 
 ## Contact
 
-- Student: Kübra Aksux
+- Student: Kübra Aksu
 - Supervisor: Prof. Dr. Matthias Boehm
-- Project: DIA Project - SystemDS Benchmarking Framework
+- Project: DIA Project - SystemDS Benchmark 
