@@ -478,44 +478,205 @@ def generate_cost_efficiency_table(rows: List[Dict[str, Any]]) -> str:
     return '\n'.join(out)
 
 
-def generate_summary_cards(rows: List[Dict[str, Any]]) -> str:
-    """Generate summary metric cards."""
-    # Get unique backends and workloads
+def generate_scatter_plot_svg(data: List[Tuple[float, float, str, str]], 
+                               title: str, x_label: str, y_label: str,
+                               width: int = 400, height: int = 300) -> str:
+    """Generate SVG scatter plot. data = [(x, y, label, color), ...]"""
+    if not data:
+        return '<p class="muted">No data with both cost and accuracy</p>'
+    
+    # Filter out invalid data
+    valid_data = [(x, y, l, c) for x, y, l, c in data if x > 0 and y is not None]
+    if not valid_data:
+        return '<p class="muted">No runs with cost data</p>'
+    
+    left_margin = 60
+    right_margin = 120
+    top_margin = 40
+    bottom_margin = 50
+    
+    chart_width = width - left_margin - right_margin
+    chart_height = height - top_margin - bottom_margin
+    
+    x_vals = [d[0] for d in valid_data]
+    y_vals = [d[1] for d in valid_data]
+    
+    x_min, x_max = 0, max(x_vals) * 1.1
+    y_min, y_max = 0, min(100, max(y_vals) * 1.1)
+    
+    def scale_x(v):
+        return left_margin + (v - x_min) / (x_max - x_min) * chart_width if x_max > x_min else left_margin
+    def scale_y(v):
+        return top_margin + chart_height - (v - y_min) / (y_max - y_min) * chart_height if y_max > y_min else top_margin + chart_height
+    
+    svg = [f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">']
+    svg.append(f'<text x="{width//2}" y="20" text-anchor="middle" font-size="14" font-weight="bold">{html.escape(title)}</text>')
+    
+    # Axes
+    svg.append(f'<line x1="{left_margin}" y1="{top_margin}" x2="{left_margin}" y2="{top_margin + chart_height}" stroke="#ccc" stroke-width="1"/>')
+    svg.append(f'<line x1="{left_margin}" y1="{top_margin + chart_height}" x2="{left_margin + chart_width}" y2="{top_margin + chart_height}" stroke="#ccc" stroke-width="1"/>')
+    
+    # Axis labels
+    svg.append(f'<text x="{left_margin + chart_width//2}" y="{height - 10}" text-anchor="middle" font-size="11">{html.escape(x_label)}</text>')
+    svg.append(f'<text x="15" y="{top_margin + chart_height//2}" text-anchor="middle" font-size="11" transform="rotate(-90, 15, {top_margin + chart_height//2})">{html.escape(y_label)}</text>')
+    
+    # Grid lines and Y axis ticks
+    for pct in [25, 50, 75, 100]:
+        if pct <= y_max:
+            y = scale_y(pct)
+            svg.append(f'<line x1="{left_margin}" y1="{y}" x2="{left_margin + chart_width}" y2="{y}" stroke="#eee" stroke-width="1"/>')
+            svg.append(f'<text x="{left_margin - 5}" y="{y + 4}" text-anchor="end" font-size="9">{pct}%</text>')
+    
+    # Points with labels - collect unique workloads for legend
+    seen_workloads = {}
+    for x, y, label, color in valid_data:
+        px, py = scale_x(x), scale_y(y)
+        svg.append(f'<circle cx="{px}" cy="{py}" r="8" fill="{color}" fill-opacity="0.7" stroke="{color}" stroke-width="2"/>')
+        if label not in seen_workloads:
+            seen_workloads[label] = color
+    
+    # Legend (on the right side)
+    legend_x = left_margin + chart_width + 15
+    legend_y = top_margin + 10
+    for i, (label, color) in enumerate(seen_workloads.items()):
+        y_pos = legend_y + i * 20
+        svg.append(f'<circle cx="{legend_x + 6}" cy="{y_pos}" r="6" fill="{color}"/>')
+        svg.append(f'<text x="{legend_x + 18}" y="{y_pos + 4}" font-size="10">{html.escape(label[:12])}</text>')
+    
+    svg.append('</svg>')
+    return '\n'.join(svg)
+
+
+def generate_summary_section(rows: List[Dict[str, Any]]) -> str:
+    """Generate comprehensive summary statistics section."""
+    # Get unique backends, workloads, models
     backends = set(r.get("backend") for r in rows if r.get("backend"))
     workloads = set(r.get("workload") for r in rows if r.get("workload"))
+    models = set(r.get("backend_model") for r in rows if r.get("backend_model"))
     total_runs = len(rows)
     
-    # Calculate averages
-    accuracies = [r.get("accuracy_mean") for r in rows if r.get("accuracy_mean") is not None]
-    avg_accuracy = sum(accuracies) / len(accuracies) * 100 if accuracies else 0
+    # Calculate stats
+    costs = [safe_float(r.get("cost")) for r in rows if r.get("backend") == "openai" and safe_float(r.get("cost"))]
+    total_cost = sum(costs) if costs else 0
+    runs_with_cost = len(costs)
+    avg_cost = total_cost / runs_with_cost if runs_with_cost > 0 else 0
     
     latencies = [safe_float(r.get("lat_p50")) for r in rows if safe_float(r.get("lat_p50")) is not None]
     avg_latency = sum(latencies) / len(latencies) if latencies else 0
+    min_latency = min(latencies) if latencies else 0
+    max_latency = max(latencies) if latencies else 0
     
-    costs = [safe_float(r.get("cost")) for r in rows if safe_float(r.get("cost")) is not None]
-    total_cost = sum(costs) if costs else 0
+    # Best/worst accuracy by workload
+    acc_by_workload: Dict[str, List[float]] = {}
+    for r in rows:
+        wl = r.get("workload", "")
+        acc = r.get("accuracy_mean")
+        if wl and acc is not None:
+            if wl not in acc_by_workload:
+                acc_by_workload[wl] = []
+            acc_by_workload[wl].append(acc * 100)
     
-    out = ['<div class="summary-cards">']
+    best_workload = ""
+    worst_workload = ""
+    best_acc = 0
+    worst_acc = 100
+    for wl, accs in acc_by_workload.items():
+        avg = sum(accs) / len(accs)
+        if avg > best_acc:
+            best_acc = avg
+            best_workload = wl
+        if avg < worst_acc:
+            worst_acc = avg
+            worst_workload = wl
     
-    cards = [
-        ("Total Runs", str(total_runs), "#3498db"),
-        ("Backends", str(len(backends)), "#9b59b6"),
-        ("Workloads", str(len(workloads)), "#e74c3c"),
-        ("Avg Accuracy", f"{avg_accuracy:.0f}%", "#2ecc71"),
-        ("Avg Latency", f"{avg_latency:.0f}ms", "#f39c12"),
-        ("Total Cost", f"${total_cost:.4f}", "#1abc9c"),
-    ]
+    out = ['<div class="summary-section">']
+    out.append('<h2>📊 Summary Statistics</h2>')
+    out.append('<div class="summary-grid">')
     
-    for label, value, color in cards:
-        out.append(f'''
-        <div class="card" style="border-left: 4px solid {color};">
-            <div class="card-value">{value}</div>
-            <div class="card-label">{label}</div>
-        </div>
-        ''')
+    # Overview card
+    out.append('''
+    <div class="summary-card">
+        <div class="card-header">OVERVIEW</div>
+        <div class="card-content">
+    ''')
+    out.append(f'<div class="stat-row"><span class="stat-label">Total Runs:</span> <span class="stat-value">{total_runs}</span></div>')
+    out.append(f'<div class="stat-row"><span class="stat-label">Workloads:</span> <span class="stat-value">{", ".join(sorted(workloads))}</span></div>')
+    out.append(f'<div class="stat-row"><span class="stat-label">Models:</span> <span class="stat-value">{", ".join(sorted(str(m) for m in models if m))}</span></div>')
+    out.append(f'<div class="stat-row"><span class="stat-label">Backends:</span> <span class="stat-value">{", ".join(sorted(backends))}</span></div>')
+    out.append('</div></div>')
     
+    # Cost card
+    out.append('''
+    <div class="summary-card">
+        <div class="card-header">💰 COST</div>
+        <div class="card-content">
+    ''')
+    out.append(f'<div class="stat-row"><span class="stat-label">Total Cost:</span> <span class="stat-value">${total_cost:.4f}</span></div>')
+    out.append(f'<div class="stat-row"><span class="stat-label">Runs with Cost:</span> <span class="stat-value">{runs_with_cost}/{total_runs}</span></div>')
+    out.append(f'<div class="stat-row"><span class="stat-label">Avg Cost/Run:</span> <span class="stat-value">${avg_cost:.4f}</span></div>')
+    out.append('</div></div>')
+    
+    # Accuracy card
+    out.append('''
+    <div class="summary-card">
+        <div class="card-header">🎯 ACCURACY</div>
+        <div class="card-content">
+    ''')
+    out.append(f'<div class="stat-row"><span class="stat-label">Best Workload:</span> <span class="stat-value">{best_workload} ({best_acc:.1f}%)</span></div>')
+    out.append(f'<div class="stat-row"><span class="stat-label">Hardest Workload:</span> <span class="stat-value">{worst_workload} ({worst_acc:.1f}%)</span></div>')
+    out.append('</div></div>')
+    
+    # Latency card
+    out.append('''
+    <div class="summary-card">
+        <div class="card-header">⚡ LATENCY</div>
+        <div class="card-content">
+    ''')
+    out.append(f'<div class="stat-row"><span class="stat-label">Avg Latency:</span> <span class="stat-value">{avg_latency:.2f} ms</span></div>')
+    out.append(f'<div class="stat-row"><span class="stat-label">Min:</span> <span class="stat-value">{min_latency:.2f} ms</span></div>')
+    out.append(f'<div class="stat-row"><span class="stat-label">Max:</span> <span class="stat-value">{max_latency:.2f} ms</span></div>')
+    out.append('</div></div>')
+    
+    out.append('</div>')  # End summary-grid
+    
+    # Visualizations section
+    out.append('<h2>📈 Visualizations</h2>')
+    out.append('<div class="viz-grid">')
+    
+    # Accuracy bar chart
+    accuracy_bars = []
+    for wl, accs in sorted(acc_by_workload.items()):
+        avg = sum(accs) / len(accs)
+        color = WORKLOAD_COLORS.get(wl, "#999")
+        accuracy_bars.append((wl, avg, color))
+    
+    out.append('<div class="viz-container">')
+    out.append(generate_bar_chart_svg(accuracy_bars, "Accuracy by Workload", width=350, height=250, value_suffix="%"))
     out.append('</div>')
+    
+    # Cost vs Accuracy scatter plot
+    scatter_data = []
+    for r in rows:
+        cost = safe_float(r.get("cost"))
+        acc = r.get("accuracy_mean")
+        wl = r.get("workload", "")
+        if cost and cost > 0 and acc is not None and wl:
+            color = WORKLOAD_COLORS.get(wl, "#999")
+            scatter_data.append((cost, acc * 100, wl, color))
+    
+    out.append('<div class="viz-container">')
+    out.append(generate_scatter_plot_svg(scatter_data, "Cost vs Accuracy", "Cost ($)", "Accuracy (%)", width=450, height=250))
+    out.append('</div>')
+    
+    out.append('</div>')  # End viz-grid
+    out.append('</div>')  # End summary-section
+    
     return '\n'.join(out)
+
+
+def generate_summary_cards(rows: List[Dict[str, Any]]) -> str:
+    """Generate summary section - wrapper for generate_summary_section."""
+    return generate_summary_section(rows)
 
 
 def generate_charts_section(rows: List[Dict[str, Any]]) -> str:
@@ -890,6 +1051,73 @@ def main() -> int:
     }}
     .card-value {{ font-size: 24px; font-weight: bold; color: #1a1a2e; }}
     .card-label {{ font-size: 12px; color: #666; margin-top: 4px; }}
+    
+    /* Summary Section */
+    .summary-section {{
+        background: #1a1a2e;
+        padding: 24px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+        color: white;
+    }}
+    .summary-section h2 {{
+        color: white;
+        border-bottom: 1px solid rgba(255,255,255,0.2);
+        margin: 0 0 20px 0;
+    }}
+    .summary-grid {{
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 30px;
+    }}
+    .summary-card {{
+        background: rgba(255,255,255,0.1);
+        padding: 16px;
+        border-radius: 8px;
+    }}
+    .card-header {{
+        font-size: 11px;
+        font-weight: 600;
+        color: rgba(255,255,255,0.7);
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }}
+    .card-content {{
+        font-size: 12px;
+    }}
+    .stat-row {{
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 6px;
+    }}
+    .stat-label {{
+        color: rgba(255,255,255,0.8);
+    }}
+    .stat-value {{
+        font-weight: 600;
+        color: white;
+    }}
+    .viz-grid {{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+    }}
+    .viz-container {{
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        min-height: 280px;
+    }}
+    
+    @media (max-width: 1200px) {{
+        .summary-grid {{ grid-template-columns: repeat(2, 1fr); }}
+        .viz-grid {{ grid-template-columns: 1fr; }}
+    }}
+    @media (max-width: 768px) {{
+        .summary-grid {{ grid-template-columns: 1fr; }}
+    }}
     
     .charts-grid {{
         display: grid;

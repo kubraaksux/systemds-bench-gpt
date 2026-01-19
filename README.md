@@ -201,16 +201,61 @@ python runner.py --backend ollama --model llama3.2 --workload workloads/math/con
 ```
 
 ### vLLM (requires GPU)
+
+vLLM is the industry-standard for LLM inference serving. Since it requires an NVIDIA GPU, here are your options:
+
+#### Option 1: Google Colab (FREE - Recommended)
+The easiest option for students. We provide a ready-to-use notebook:
+
 ```bash
-# On a GPU machine, start vLLM server
+# Open in Google Colab:
+# notebooks/vllm_colab.ipynb
+
+# Steps:
+# 1. Open notebook in Colab
+# 2. Runtime → Change runtime type → T4 GPU
+# 3. Run all cells
+# 4. Download results.zip
+# 5. Extract to results/ folder locally
+```
+
+#### Option 2: RunPod (~$0.20/hour)
+Cheap GPU cloud with easy vLLM setup:
+
+```bash
+# 1. Create account at https://runpod.io
+# 2. Deploy a GPU pod (RTX 3090 is cheap and good)
+# 3. SSH into pod and run:
+pip install vllm
+python -m vllm.entrypoints.openai.api_server --model microsoft/phi-2 --host 0.0.0.0 --port 8000
+
+# 4. Use ngrok or pod's public URL to connect:
+export VLLM_BASE_URL="https://your-pod-url:8000"
+python runner.py --backend vllm --model microsoft/phi-2 --workload workloads/math/config.yaml
+```
+
+#### Option 3: Lambda Labs (~$0.50/hour)
+Professional GPU cloud with better GPUs:
+
+```bash
+# 1. Create account at https://lambdalabs.com/cloud
+# 2. Launch an A10 or A100 instance
+# 3. SSH and run same vLLM commands as above
+```
+
+#### Option 4: Local GPU
+If you have access to an NVIDIA GPU:
+
+```bash
 pip install vllm
 python -m vllm.entrypoints.openai.api_server --model microsoft/phi-2 --port 8000
 
-# Run benchmark (from any machine that can reach the server)
+# In another terminal:
 python runner.py --backend vllm --model microsoft/phi-2 --workload workloads/math/config.yaml --out results/test
-
-# Or use Google Colab (free GPU): see notebooks/vllm_colab.ipynb
 ```
+
+#### Option 5: University Server
+Ask your supervisor for access to university GPU resources.
 
 ### MLX (Apple Silicon only)
 ```bash
