@@ -32,7 +32,7 @@ class ResourceMonitor:
         self.running = True
         self.memory_samples = []
         self.cpu_samples = []
-        self.initial_memory = self.process.memory_info().rss / 1024 / 1024  # mB
+        self.initial_memory = self.process.memory_info().rss / 1024 / 1024  # MB
         
         def monitor():
             while self.running:

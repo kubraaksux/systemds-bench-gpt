@@ -35,7 +35,7 @@ SYSTEMDS-BENCH-GPT is a systems-oriented evaluation harness for comparing local 
 | `math` | GSM8K | Grade school math word problems |
 | `summarization` | XSum, CNN/DM | Text summarization |
 | `reasoning` | BoolQ, LogiQA | Logical reasoning / QA |
-| `json_extraction` | CoNLL-2003 NER | Structured JSON extraction |
+| `json_extraction` | Curated toy | Structured JSON extraction |
 
 ---
 
@@ -142,11 +142,6 @@ systemds-bench-gpt/
 └── README.md
 ```
 
----
-
-## Metrics Reported
-
-Following research methodology from ["Unlocking the Potential of Speculative Decoding"](https://arxiv.org/abs/2404.12345), we measure comprehensive performance dimensions:
 
 ### Latency Metrics
 | Metric | Description |
@@ -499,13 +494,6 @@ Some metrics are estimated rather than precisely measured:
 7. **TTFT Estimation for Non-Streaming**: MLX and vLLM (non-streaming) estimate TTFT as ~10% of total latency rather than measuring actual first-token time.
 
 8. **Token Estimation for Local Backends**: Ollama and MLX estimate token counts (~4 characters per token) rather than using actual tokenizer.
-
----
-
-## License
-
-This project is developed as part of the SystemDS research group at TU Berlin.
-License information will be added as the project matures.
 
 ---
 

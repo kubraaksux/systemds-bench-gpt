@@ -38,7 +38,7 @@ def load_samples(cfg: Dict[str, Any]) -> List[Sample]:
     dataset_cfg = cfg.get("dataset", {})
     source = dataset_cfg.get("source", "toy")
     n = int(dataset_cfg.get("n_samples", 10))
-
+    
     if source == "toy":
         return _load_toy_samples(n)
     elif source == "gsm8k":
@@ -77,7 +77,7 @@ def _load_gsm8k_samples(n: int) -> List[Sample]:
         question = item["question"]
         answer_text = item["answer"]
         
-        # gSM8K answers are formatted as step-by-step solution ending with #### final_answer
+        # GSM8K answers are formatted as step-by-step solution ending with #### final_answer
         # extract the final numerical answer after ####
         final_answer = extract_gsm8k_answer(answer_text)
         
@@ -149,7 +149,7 @@ def extract_number_from_response(text: str) -> Optional[str]:
     # strategy 1: Look for explicit "answer is" patterns (highest priority)
     # take the FIRST match in the main answer section (not follow-ups)
     answer_patterns = [
-        r'####\s*\$?([0-9,]+(?:\.[0-9]+)?)',  # gSM8K format: #### 42
+        r'####\s*\$?([0-9,]+(?:\.[0-9]+)?)',  # GSM8K format: #### 42
         r'(?:the\s+)?(?:final\s+)?answer\s*(?:is|=|:)[:\s]*\$?([0-9,]+(?:\.[0-9]+)?)',
         r'[Aa]nswer[:\s]+[A-Za-z\s]*\$?([0-9,]+(?:\.[0-9]+)?)',  # "Answer: Janet makes $18"
         r'takes?\s+(\d+)\s+(?:bolts?|cups?|items?|pieces?)\s+(?:in\s+total|total)',  # "takes 3 bolts in total"
