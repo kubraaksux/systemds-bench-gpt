@@ -1,5 +1,4 @@
 """
-vLLM Backend for high-performance LLM inference.
 
 vLLM is the industry-standard for LLM inference serving, offering:
 - High throughput with PagedAttention
@@ -18,13 +17,6 @@ Running vLLM server:
     # Or use Docker
     docker run --gpus all -p 8000:8000 vllm/vllm-openai:latest \
         --model meta-llama/Llama-2-7b-chat-hf
-
-Usage:
-    python runner.py --backend vllm --model meta-llama/Llama-2-7b-chat-hf \
-        --workload workloads/math/config.yaml
-
-Environment variables:
-    VLLM_BASE_URL: vLLM server URL (default: http://localhost:8000)
 """
 
 import os
@@ -54,7 +46,7 @@ class VLLMBackend:
         self.base_url = base_url or os.environ.get("VLLM_BASE_URL", "http://localhost:8000")
         self.base_url = self.base_url.rstrip("/")
         
-        # Verify connection
+
         try:
             resp = requests.get(f"{self.base_url}/v1/models", timeout=10)
             resp.raise_for_status()
@@ -72,7 +64,6 @@ class VLLMBackend:
                 f"Start vLLM with: python -m vllm.entrypoints.openai.api_server --model {model}"
             )
         except Exception as e:
-            # Server might be running but /v1/models endpoint might not be available
             print(f"Warning: Could not verify vLLM server: {e}")
     
     def generate(self, prompts: List[str], config: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -129,7 +120,7 @@ class VLLMBackend:
         chunks = []
         usage_data = None
         
-        # Stream response
+        # stream response
         with requests.post(url, json=payload, headers=headers, stream=True, timeout=300) as resp:
             resp.raise_for_status()
             
@@ -141,7 +132,7 @@ class VLLMBackend:
                 if not line.startswith("data: "):
                     continue
                 
-                data_str = line[6:]  # Remove "data: " prefix
+                data_str = line[6:] 
                 if data_str == "[DONE]":
                     break
                 
@@ -151,7 +142,7 @@ class VLLMBackend:
                 except json.JSONDecodeError:
                     continue
                 
-                # Capture time to first token
+                # time to first token
                 choices = chunk.get("choices", [])
                 if choices and t_first is None:
                     text = choices[0].get("text", "")
@@ -163,31 +154,32 @@ class VLLMBackend:
                     if text:
                         chunks.append(text)
                 
-                # Capture usage if available
+
                 if "usage" in chunk:
                     usage_data = chunk["usage"]
         
         t1 = time.perf_counter()
         
-        # Combine response
+        # combine response
         text = "".join(chunks)
         
-        # Calculate metrics
+        # metrics
         total_latency_ms = (t1 - t0) * 1000.0
         ttft_ms = (t_first - t0) * 1000.0 if t_first else total_latency_ms * 0.1
         generation_ms = (t1 - t_first) * 1000.0 if t_first else total_latency_ms * 0.9
         
-        # Token counts
+        # token counts
         if usage_data:
             in_tokens = usage_data.get("prompt_tokens", 0)
             out_tokens = usage_data.get("completion_tokens", 0)
         else:
-            # Estimate
+            # estimate
             in_tokens = len(prompt) // 4
             out_tokens = len(text) // 4
         
-        # Estimate compute cost based on cloud GPU equivalent
+        # estimate compute cost based on cloud GPU equivalent
         # T4 GPU: ~$0.35/hr, A100: ~$1.50/hr - use T4 as typical Colab GPU
+
         compute_hours = total_latency_ms / 1000.0 / 3600.0
         
         return {
@@ -240,7 +232,7 @@ class VLLMBackend:
         
         total_latency_ms = (t1 - t0) * 1000.0
         
-        # Estimate compute cost based on T4 GPU (~$0.35/hr)
+        # estimate compute cost based on T4 GPU (~$0.35/hr)
         compute_hours = total_latency_ms / 1000.0 / 3600.0
         
         return {

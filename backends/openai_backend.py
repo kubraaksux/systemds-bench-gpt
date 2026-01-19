@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 
-# Pricing per million tokens (USD)
+# pricing per million tokens (USD)
 # Reference: https://openai.com/api/pricing/
 PRICING = {
     "gpt-4.1-mini": {
@@ -51,22 +51,22 @@ class OpenAIBackend:
     """
 
     def __init__(self, api_key: Optional[str] = None):
-        load_dotenv()  # loads .env from repo root
+        load_dotenv()  
         api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY is not set.")
         self.client = OpenAI(api_key=api_key)
 
     def generate(self, prompts: List[str], config: Dict[str, Any]) -> List[Dict[str, Any]]:
-        model = config.get("model", "gpt-4.1-mini")  # safe default; override via config
+        model = config.get("model", "gpt-4.1-mini")  # safe default
         max_output_tokens = int(config.get("max_output_tokens", 256))
-        # For benchmarking, keep temperature deterministic unless you explicitly vary it.
+        # for benchmarking, temperature kept deterministic.
         temperature = config.get("temperature", 0.0)
         
-        # NEW: Check if streaming mode is enabled for TTFT measurement
+
         use_streaming = config.get("streaming", False)
 
-        # Simple retry/backoff for transient errors / rate limits
+
         max_retries = int(config.get("max_retries", 5))
         base_sleep = float(config.get("base_sleep_s", 0.5))
 
@@ -77,12 +77,12 @@ class OpenAIBackend:
             for attempt in range(max_retries):
                 try:
                     if use_streaming:
-                        # STREAMING MODE: Measure TTFT
+                        # streaming mode: measure TTFT
                         result = self._generate_streaming(
                             prompt, model, max_output_tokens, temperature
                         )
                     else:
-                        # NON-STREAMING MODE: Current behavior
+                        # non-streaming mode: current behavior
                         result = self._generate_non_streaming(
                             prompt, model, max_output_tokens, temperature
                         )
@@ -95,7 +95,6 @@ class OpenAIBackend:
                     time.sleep(base_sleep * (2**attempt))
 
             if last_err is not None:
-                # Fail fast per-sample with explicit error stored
                 results.append(
                     {
                         "text": "",
@@ -117,7 +116,7 @@ class OpenAIBackend:
         )
         t1 = time.perf_counter()
 
-        # Extract text output
+
         text = ""
         try:
             text = resp.output_text
@@ -126,19 +125,19 @@ class OpenAIBackend:
 
         extra: Dict[str, Any] = {}
 
-        # Usage fields vary by endpoint/version; keep raw usage if present
+        # usage fields vary by endpoint
         usage = getattr(resp, "usage", None)
         usage_data = None
         if usage is not None:
             usage_data = self._extract_usage(usage)
             if usage_data is not None:
                 extra["usage"] = usage_data
-                # Calculate cost based on usage
+                # calculate cost based on usage
                 cost = self._calculate_cost(usage_data, model)
                 if cost is not None:
                     extra["cost_usd"] = cost
 
-        # Also store response id for traceability
+        # also store response id for traceability
         extra["response_id"] = getattr(resp, "id", None)
 
         return {
@@ -165,7 +164,6 @@ class OpenAIBackend:
         usage_data = None
         
         for event in stream:
-            # Listen for the first delta event
             if event.type == "response.output_text.delta":
                 if t_first is None:
                     t_first = time.perf_counter()  # ← TTFT!
@@ -173,36 +171,30 @@ class OpenAIBackend:
             
             elif event.type == "response.completed":
                 t_final = time.perf_counter()
-                # The response.completed event contains the full response object with usage
                 response = getattr(event, "response", None)
                 if response is not None:
                     response_id = getattr(response, "id", None)
-                    # Extract usage data (same format as non-streaming)
                     usage = getattr(response, "usage", None)
                     if usage is not None:
                         usage_data = self._extract_usage(usage)
                 else:
-                    # Fallback: try to get response_id directly from event
                     response_id = getattr(event, "response_id", None) or getattr(event, "id", None)
-                    # Also check if usage is on the event itself
                     usage = getattr(event, "usage", None)
                     if usage is not None:
                         usage_data = self._extract_usage(usage)
         
-        # Fallback: check if stream object has usage after iteration completes
-        # (Some OpenAI SDK versions expose usage on the stream object)
+        # fallback
         if usage_data is None:
             stream_usage = getattr(stream, "usage", None)
             if stream_usage is not None:
                 usage_data = self._extract_usage(stream_usage)
         
-        # Handle case where no tokens were generated
         if t_first is None:
             t_first = time.perf_counter()
         if t_final is None:
             t_final = time.perf_counter()
         
-        # Calculate metrics
+        # metrics
         ttft_ms = (t_first - t0) * 1000.0
         generation_ms = (t_final - t_first) * 1000.0
         total_latency_ms = (t_final - t0) * 1000.0
@@ -212,18 +204,17 @@ class OpenAIBackend:
             "generation_ms": generation_ms,
             "response_id": response_id,
         }
-        
-        # Add usage data if available (same format as non-streaming)
+
         if usage_data is not None:
             extra["usage"] = usage_data
-            # Calculate cost based on usage
+            # cost based on usage
             cost = self._calculate_cost(usage_data, model)
             if cost is not None:
                 extra["cost_usd"] = cost
         
         return {
             "text": full_text,
-            "latency_ms": total_latency_ms,  # Keep this for backwards compatibility
+            "latency_ms": total_latency_ms, 
             "extra": extra,
         }
     
@@ -249,7 +240,7 @@ class OpenAIBackend:
         elif isinstance(usage, dict):
             return usage
         else:
-            # Fallback for unexpected types
+            # fallback
             return {"raw": str(usage)}
     
     def _calculate_cost(self, usage_data: Optional[Dict[str, Any]], model: str) -> Optional[float]:
@@ -267,12 +258,12 @@ class OpenAIBackend:
         if input_tokens == 0 and output_tokens == 0:
             return None
         
-        # Look up pricing for the model
+        # pricing for the model
         prices = PRICING.get(model)
         if prices is None:
             return None
         
-        # Calculate cost: tokens * price_per_million / 1,000,000
+        # cost: tokens * price_per_million / 1,000,000
         cost = (
             input_tokens * prices["input"] / 1_000_000 +
             output_tokens * prices["output"] / 1_000_000

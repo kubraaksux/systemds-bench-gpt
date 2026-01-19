@@ -438,6 +438,7 @@ This design ensures the benchmark is ready for SystemDS evaluation while providi
 | **SystemDS Backend** | Integrate when SystemDS LLM inference is available | High |
 | **Real TTFT for All Backends** | Implement streaming mode for MLX/vLLM to measure actual TTFT | High |
 | **GPU Profiling** | GPU memory and utilization via `nvidia-smi` or `pynvml` | High |
+| **Larger Models for vLLM** | Test Llama-2-7B or Llama-3-8B for better accuracy (phi-2 is 2.7B) | High |
 | **Embeddings Workload** | Add similarity/clustering tasks using embedding APIs | Medium |
 | **Hardware Cost Analysis** | Estimate $/query for local backends (electricity, GPU rental) | Medium |
 | **Larger Sample Sizes** | Run benchmarks with n=100+ for statistical significance | Medium |

@@ -1,16 +1,10 @@
 """
-Ollama Backend for local LLM inference.
-
-Ollama is a popular local LLM runner that works on macOS, Linux, and Windows.
-It provides a simple API similar to OpenAI's API format.
 
 Installation:
     1. Download Ollama from https://ollama.ai
     2. Run: ollama pull llama3.2  (or any other model)
     3. Ollama runs as a local server on http://localhost:11434
 
-Usage:
-    python runner.py --backend ollama --model llama3.2 --workload workloads/math/config.yaml
 """
 
 import time
@@ -24,7 +18,7 @@ class OllamaBackend:
     
     def __init__(self, model: str, base_url: str = "http://localhost:11434"):
         """
-        Initialize Ollama backend.
+        Initialize Ollama back.
         
         Args:
             model: Model name (e.g., "llama3.2", "mistral", "phi3")
@@ -39,7 +33,6 @@ class OllamaBackend:
             resp.raise_for_status()
             available_models = [m["name"] for m in resp.json().get("models", [])]
             
-            # Check if model is available (handle both "llama3.2" and "llama3.2:latest")
             model_base = model.split(":")[0]
             if not any(model_base in m for m in available_models):
                 print(f"Warning: Model '{model}' not found. Available: {available_models}")
@@ -107,7 +100,6 @@ class OllamaBackend:
         t_first = None
         chunks = []
         
-        # Stream response
         with requests.post(url, json=payload, stream=True, timeout=300) as resp:
             resp.raise_for_status()
             
@@ -118,33 +110,30 @@ class OllamaBackend:
                 import json
                 chunk = json.loads(line)
                 
-                # Capture time to first token
+                # capture time to first token
                 if t_first is None and chunk.get("response"):
                     t_first = time.perf_counter()
                 
                 if chunk.get("response"):
                     chunks.append(chunk["response"])
                 
-                # Check if done
                 if chunk.get("done"):
                     break
         
         t1 = time.perf_counter()
         
-        # Combine response
         text = "".join(chunks)
         
-        # Calculate metrics
         total_latency_ms = (t1 - t0) * 1000.0
         ttft_ms = (t_first - t0) * 1000.0 if t_first else total_latency_ms
         generation_ms = (t1 - t_first) * 1000.0 if t_first else 0.0
         
-        # Estimate token counts (Ollama doesn't always return this)
-        # Use rough estimate: ~4 chars per token
+        # estimate token counts (Ollama doesn't always return this)
+        # rough estimate: ~4 chars per token
         in_tokens = len(prompt) // 4
         out_tokens = len(text) // 4
         
-        # Estimate compute cost based on typical consumer GPU (~$0.30/hr equivalent)
+        # estimate compute cost based on typical consumer GPU (~$0.30/hr equivalent)
         compute_hours = total_latency_ms / 1000.0 / 3600.0
         
         return {

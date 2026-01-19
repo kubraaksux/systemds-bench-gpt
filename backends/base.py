@@ -11,7 +11,7 @@ class GenerationResult(TypedDict, total=False):
 class InferenceBackend(Protocol):
     """
     Minimal contract all inference backends must implement.
-    Keep this interface stable after PR1.
+
     """
 
     def generate(
