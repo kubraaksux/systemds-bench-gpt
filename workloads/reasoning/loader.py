@@ -231,6 +231,53 @@ def normalize_answer(answer: str) -> str:
     return answer
 
 
+def is_negated(text: str, match_start: int, match_end: int = None) -> bool:
+    """
+    Check if the match is negated by 'not', 'no', 'incorrect', etc. before or after it.
+
+    Args:
+        text: The full text
+        match_start: The starting index of the match to check
+        match_end: The ending index of the match (optional, for checking negation after)
+
+    Returns:
+        True if the match appears to be negated
+    """
+    # check 60 chars before (increased context)
+    start = max(0, match_start - 60)
+    context_before = text[start:match_start].lower()
+
+    # check 60 chars after if provided
+    context_after = ""
+    if match_end is not None:
+        end = min(len(text), match_end + 60)
+        context_after = text[match_end:end].lower()
+
+    # Common negation words/phrases (before)
+    negations_before = [
+        "not", "no", "incorrect", "wrong", "isn't", "aren't", "failed to",
+        "don't", "doesn't", "didn't", "false", "neither", "nor", "never"
+    ]
+
+    # Common negation phrases (after)
+    negations_after = [
+        "is incorrect", "is wrong", "is false", "is not correct", "is not the answer"
+    ]
+
+    # check if any negation word is present as a whole word in the context before
+    for neg in negations_before:
+        if re.search(r'\b' + re.escape(neg) + r'\b', context_before):
+            return True
+
+    # check if any negation phrase is present in the context after
+    if context_after:
+        for neg in negations_after:
+            if re.search(r'\b' + re.escape(neg) + r'\b', context_after):
+                return True
+
+    return False
+
+
 def extract_answer_from_prediction(prediction: str) -> Optional[str]:
     """
     Extract the final answer from a model's prediction.
@@ -261,7 +308,12 @@ def extract_answer_from_prediction(prediction: str) -> Optional[str]:
     for pattern in patterns:
         match = re.search(pattern, prediction, re.IGNORECASE)
         if match:
-            return match.group(1).strip()
+            # check if the match itself is negated (e.g. "incorrect answer is")
+            if is_negated(prediction, match.start(), match.end()):
+                continue
+
+            val = match.group(1).strip()
+            return val
     
     # strategy 3: LaTeX boxed format
     match = re.search(r"\\boxed\{([^}]+)\}", prediction)
@@ -301,7 +353,15 @@ def accuracy_check(prediction: str, reference: str) -> bool:
     
     if pred_answer is None:
         # fallback: check if reference appears in prediction
-        return normalize_answer(reference) in normalize_answer(prediction)
+        # Use STRICT check with negation detection and word boundaries
+        ref_norm = normalize_answer(reference)
+        pred_full_norm = normalize_answer(prediction)
+
+        # We search in the FULL prediction (normalized)
+        for match in re.finditer(r'\b' + re.escape(ref_norm) + r'\b', pred_full_norm):
+            if not is_negated(pred_full_norm, match.start(), match.end()):
+                return True
+        return False
     
     # normalize both for comparison
     pred_normalized = normalize_answer(pred_answer)
@@ -311,9 +371,26 @@ def accuracy_check(prediction: str, reference: str) -> bool:
     if pred_normalized == ref_normalized:
         return True
     
-    # check if one contains the other (for answers like "5 cents" vs "5")
-    if ref_normalized in pred_normalized or pred_normalized in ref_normalized:
-        return True
+    # check if reference is in prediction (e.g. pred="option c", ref="c")
+    # BUT must check for negation
+    if ref_normalized in pred_normalized:
+        # Find where it matches
+        idx = pred_normalized.find(ref_normalized)
+        if not is_negated(pred_normalized, idx, idx + len(ref_normalized)):
+            return True
+
+    # check if pred is in ref (e.g. pred="c", ref="option c")
+    if pred_normalized in ref_normalized:
+         # This direction usually doesn't involve negation of the prediction itself
+         # but we should be careful.
+         # e.g. pred="not c", ref="c". "c" in "not c".
+         # We need to check if pred matches a part of ref, and if pred was negated in extraction?
+         # If pred is "not c", normalize_answer keeps "not c".
+         # If ref is "option c". "not c" is not in "option c".
+         # If ref is "c". "c" in "not c". This is caught by the previous check (ref in pred).
+         # So this check (pred in ref) handles cases like pred="5", ref="5 cents".
+         # Negation check on pred doesn't make sense here because pred IS the extracted text.
+         return True
     
     # try numeric comparison for number answers
     try:

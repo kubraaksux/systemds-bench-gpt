@@ -106,6 +106,33 @@ def extract_gsm8k_answer(answer_text: str) -> Optional[str]:
     return None
 
 
+def is_negated(text: str, match_start: int, match_end: int = None) -> bool:
+    """Check if the match is negated by 'not', 'no', '!=', etc. before or after it."""
+    # check 20 chars before
+    start = max(0, match_start - 20)
+    context_before = text[start:match_start].lower()
+
+    # Check for != where ! is immediately before match_start (assuming match_start might be at =)
+    if match_start > 0 and text[match_start-1] == '!' and text[match_start] == '=':
+        return True
+
+    negations_before = ["not", "no", "incorrect", "wrong", "isn't", "aren't", "!=", "≠"]
+    for neg in negations_before:
+        if re.search(r'\b' + re.escape(neg) + r'\b', context_before) or (neg in ["!=", "≠"] and neg in context_before):
+            return True
+
+    # check 20 chars after if provided
+    if match_end is not None:
+        end = min(len(text), match_end + 20)
+        context_after = text[match_end:end].lower()
+        negations_after = ["is wrong", "is incorrect", "is false", "is not correct"]
+        for neg in negations_after:
+            if re.search(r'\b' + re.escape(neg) + r'\b', context_after):
+                return True
+
+    return False
+
+
 def extract_number_from_response(text: str) -> Optional[str]:
     """
     Extract the final numerical answer from model response.
@@ -157,10 +184,13 @@ def extract_number_from_response(text: str) -> Optional[str]:
     ]
     
     for pattern in answer_patterns:
-        matches = re.findall(pattern, main_answer_text, re.IGNORECASE)
-        if matches:
-            # take the FIRST match (main answer, not follow-up)
-            return clean_num(matches[0])
+        for match in re.finditer(pattern, main_answer_text, re.IGNORECASE):
+            # check if the number itself is negated (check before group 1)
+            val = match.group(1)
+            start_idx = match.start(1)
+            end_idx = match.end(1)
+            if not is_negated(main_answer_text, start_idx, end_idx):
+                return clean_num(val)
     
     # strategy 2: Look for bolded/boxed answers (common LLM format)
     bold_patterns = [
@@ -181,7 +211,9 @@ def extract_number_from_response(text: str) -> Optional[str]:
         # look for "= $X" or "= X" patterns that end sentences  
         match = re.search(r'=\s*\$?([0-9,]+(?:\.[0-9]+)?)\s*(?:/day|/week|per\s+\w+)?\s*[.!?]?\s*$', line.strip())
         if match:
-            return clean_num(match.group(1))
+            # check negation in the line itself
+            if not is_negated(line.strip(), match.start(), match.end()):
+                return clean_num(match.group(1))
     
     # strategy 4: Look for specific final answer patterns
     # "So, Josh made a profit of $70,000" or "earnings for this week are $460"
@@ -198,19 +230,23 @@ def extract_number_from_response(text: str) -> Optional[str]:
             return clean_num(matches[-1])
     
     # strategy 5: Look for currency amounts in the full answer
-    currency_matches = re.findall(r'\$([0-9,]+(?:\.[0-9]+)?)', main_answer_text)
-    if currency_matches:
-        return clean_num(currency_matches[-1])
+    # iterate backwards
+    currency_matches = list(re.finditer(r'\$([0-9,]+(?:\.[0-9]+)?)', main_answer_text))
+    for match in reversed(currency_matches):
+        if not is_negated(main_answer_text, match.start(1), match.end(1)):
+            return clean_num(match.group(1))
     
-    # strategy 5: Look for the last number followed by period/end (sentence-ending number)
-    matches = re.findall(r'\b([0-9,]+(?:\.[0-9]+)?)\s*[.!?]?\s*$', main_answer_text, re.MULTILINE)
-    if matches:
-        return clean_num(matches[-1])
+    # strategy 6: Look for the last number followed by period/end (sentence-ending number)
+    matches = list(re.finditer(r'\b([0-9,]+(?:\.[0-9]+)?)\s*[.!?]?\s*$', main_answer_text, re.MULTILINE))
+    for match in reversed(matches):
+        if not is_negated(main_answer_text, match.start(1), match.end(1)):
+            return clean_num(match.group(1))
     
     # final fallback: any number (take the last one from main text)
-    numbers = re.findall(r'\b([0-9,]+(?:\.[0-9]+)?)\b', main_answer_text)
-    if numbers:
-        return clean_num(numbers[-1])
+    numbers = list(re.finditer(r'\b([0-9,]+(?:\.[0-9]+)?)\b', main_answer_text))
+    for match in reversed(numbers):
+        if not is_negated(main_answer_text, match.start(1), match.end(1)):
+            return clean_num(match.group(1))
     
     return None
 
